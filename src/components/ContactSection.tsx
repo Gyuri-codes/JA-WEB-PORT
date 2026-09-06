@@ -19,13 +19,18 @@ export function ContactSection({ currentTheme, onOpenResume }: ContactSectionPro
   const [submitted, setSubmitted] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
+  const [copiedMessage, setCopiedMessage] = useState(false);
+  const [showFallbackHelper, setShowFallbackHelper] = useState(false);
 
   const themeConfig = THEME_CONFIGS[currentTheme];
+
+  const fullMessageBody = `Name: ${formData.name}\nEmail: ${formData.email}\nSubject: ${formData.subject}\n\nMessage:\n${formData.message}`;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     soundManager.playSuccess();
     setSubmitted(true);
+    setShowFallbackHelper(true);
 
     // Launch default email client with populated fields
     const mailtoUrl = `mailto:${PERSONAL_INFO.email}?subject=${encodeURIComponent(
@@ -34,8 +39,22 @@ export function ContactSection({ currentTheme, onOpenResume }: ContactSectionPro
       `Name: ${formData.name}\nEmail: ${formData.email}\n\nMessage:\n${formData.message}`
     )}`;
     window.location.href = mailtoUrl;
+  };
 
-    setTimeout(() => setSubmitted(false), 5000);
+  const copyPreparedMessage = () => {
+    navigator.clipboard.writeText(fullMessageBody);
+    setCopiedMessage(true);
+    soundManager.playClick();
+    setTimeout(() => setCopiedMessage(false), 3000);
+  };
+
+  const openGmailWeb = () => {
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+      PERSONAL_INFO.email
+    )}&su=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(
+      `Name: ${formData.name}\nEmail: ${formData.email}\n\nMessage:\n${formData.message}`
+    )}`;
+    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
   };
 
   const copyEmail = () => {
@@ -235,8 +254,44 @@ export function ContactSection({ currentTheme, onOpenResume }: ContactSectionPro
                 className="w-full py-4 px-6 font-semibold text-[10px] uppercase tracking-[0.25em] text-[#0F0F0F] bg-[#C5A059] border border-[#C5A059] hover:bg-transparent hover:text-[#C5A059] transition-all duration-300 shadow-xl flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{submitted ? 'Opening Email Client...' : 'Dispatch Inquiry to Jeric'}</span>
+                <span>{submitted ? 'Email Client Triggered' : 'Dispatch Inquiry to Jeric'}</span>
               </button>
+
+              {showFallbackHelper && (
+                <div className="p-4 bg-[#141414] border border-[#C5A059]/40 animate-in fade-in duration-300 space-y-3 text-xs">
+                  <div className="flex items-center justify-between text-[#C5A059] font-medium">
+                    <span>Email client didn't open?</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowFallbackHelper(false)}
+                      className="text-[#888888] hover:text-white text-[10px] uppercase font-mono"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  <p className="text-[#999999] text-[11px] leading-relaxed">
+                    No problem. You can copy your prepared message to paste into any email service, or launch Gmail in your browser:
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={copyPreparedMessage}
+                      className="px-3 py-1.5 bg-[#1A1A1A] border border-[#333333] hover:border-[#C5A059] text-white text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 transition-colors"
+                    >
+                      {copiedMessage ? <Check className="w-3 h-3 text-[#C5A059]" /> : <Copy className="w-3 h-3 text-[#C5A059]" />}
+                      <span>{copiedMessage ? 'Message Copied!' : 'Copy Formatted Message'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openGmailWeb}
+                      className="px-3 py-1.5 bg-[#1A1A1A] border border-[#333333] hover:border-[#C5A059] text-[#C5A059] text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 transition-colors"
+                    >
+                      <Mail className="w-3 h-3" />
+                      <span>Open in Gmail Web</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="text-[10px] font-mono text-[#666666] uppercase tracking-wider text-center pt-2">
                 Sends directly to <strong className="text-[#C5A059]">{PERSONAL_INFO.email}</strong>
