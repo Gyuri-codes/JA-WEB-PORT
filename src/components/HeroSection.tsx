@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake } from 'lucide-react';
+import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake, Ghost } from 'lucide-react';
 import { ThemeId } from '../types';
 import { PERSONAL_INFO, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -85,16 +85,28 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           </button>
         </div>
 
-        {/* Subtle Secondary Project Link */}
-        <div className="mb-14">
+        {/* Subtle Secondary Project Links */}
+        <div className="mb-14 flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => document.getElementById('the-house')?.scrollIntoView({ behavior: 'smooth' })}
+            id="hero-the-house-link"
+            className="inline-flex items-center gap-2 text-xs text-[#ff9999] hover:text-white transition-colors group px-4 py-2 border border-[#442222] bg-[#1a0f0f] hover:bg-[#2a1414] shadow-sm cursor-pointer"
+          >
+            <Ghost className="w-3.5 h-3.5 text-[#ff6b6b] transition-transform group-hover:scale-110" />
+            <span className="uppercase tracking-[0.2em] font-medium">
+              New: The House That Remembers
+            </span>
+            <span className="text-[#888888] font-light lowercase">(horror web game)</span>
+          </button>
+
           <button
             onClick={scrollToMindMeld}
             id="hero-mind-meld-link"
-            className="inline-flex items-center gap-2.5 text-xs text-[#888888] hover:text-[#C5A059] transition-colors group px-4 py-2 border border-transparent hover:border-[#2a2a2a] bg-transparent hover:bg-[#141414]"
+            className="inline-flex items-center gap-2.5 text-xs text-[#888888] hover:text-[#C5A059] transition-colors group px-4 py-2 border border-[#2a2a2a] bg-[#141414] hover:bg-[#1a1a1a] cursor-pointer"
           >
             <Gamepad2 className="w-3.5 h-3.5 text-[#C5A059] transition-transform group-hover:rotate-12" />
             <span className="uppercase tracking-[0.2em] font-medium">
-              {PERSONAL_INFO.currentProject.label}
+              Mind Meld 2.0
             </span>
             <span className="text-[#555555] font-light lowercase">({PERSONAL_INFO.currentProject.subtitle})</span>
           </button>

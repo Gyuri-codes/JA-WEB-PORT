@@ -1,6 +1,6 @@
-import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles } from 'lucide-react';
+import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost } from 'lucide-react';
 import { ThemeId } from '../types';
-import { PERSONAL_INFO, THEME_CONFIGS } from '../data/portfolioData';
+import { PERSONAL_INFO, THEME_CONFIGS, HORROR_GAME_CASE_STUDY } from '../data/portfolioData';
 
 interface ProjectsSectionProps {
   currentTheme: ThemeId;
@@ -11,12 +11,28 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
 
   const projects = [
     {
+      id: "the-house-that-remembers",
+      title: "The House That Remembers",
+      category: "Psychological Horror Web Game",
+      tagline: "An immersive first-person psychological horror browser experience inspired by classic browser horror like Hotel 626.",
+      tools: ["Web Audio", "Interactive Horror", "Atmospheric 3D", "GitHub Pages"],
+      isFeatured: true,
+      badgeText: "New Game",
+      badgeColor: "text-[#ff6b6b] bg-[#ff6b6b]/10 border-[#ff6b6b]/40",
+      accentBorder: "border-[#ff6b6b]/80",
+      link: HORROR_GAME_CASE_STUDY.officialUrl,
+      actionText: "Play Horror Game"
+    },
+    {
       id: "mind-meld",
       title: "Mind Meld 2.0",
       category: "AI-Assisted Web Game",
       tagline: "An interactive browser-based game built through human-AI creative collaboration.",
       tools: ["Web Tech", "AI-Assisted Workflows", "GitHub Pages", "Game Mechanics"],
       isFeatured: true,
+      badgeText: "Featured Game",
+      badgeColor: "text-[#C5A059] bg-[#C5A059]/10 border-[#C5A059]/40",
+      accentBorder: "border-[#C5A059]",
       link: PERSONAL_INFO.currentProject.link,
       actionText: "Play Live Game"
     },
@@ -27,6 +43,9 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
       tagline: "Standardized table-service, customer communication, and food safety protocols synthesized during SIL internships.",
       tools: ["Food Safety", "Table Etiquette", "Guest Care", "Workflow Standards"],
       isFeatured: false,
+      badgeText: "Operational",
+      badgeColor: "text-[#888888] bg-[#141414] border-[#333333]",
+      accentBorder: "border-[#333333]",
       link: "#experience",
       actionText: "View Internship Experience"
     },
@@ -37,6 +56,9 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
       tagline: "Comprehensive front desk workflow mapping guest arrival, reservations, and swift conflict resolution.",
       tools: ["Front Office", "NC II Standards", "Active Listening", "Problem Solving"],
       isFeatured: false,
+      badgeText: "Certified",
+      badgeColor: "text-[#888888] bg-[#141414] border-[#333333]",
+      accentBorder: "border-[#333333]",
       link: "#certifications",
       actionText: "View NC II Credentials"
     }
@@ -62,15 +84,13 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
         </div>
 
         {/* Projects Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {projects.map((proj) => (
             <div
               key={proj.id}
-              className={`p-8 flex flex-col justify-between transition-all duration-300 relative bg-[#1A1A1A] group shadow-2xl overflow-hidden ${
-                proj.isFeatured
-                  ? 'border border-[#C5A059]'
-                  : 'border border-[#333333] hover:border-[#C5A059]/60'
-              }`}
+              className={`p-8 flex flex-col justify-between transition-all duration-300 relative bg-[#1A1A1A] group shadow-2xl overflow-hidden border ${
+                proj.accentBorder || 'border-[#333333]'
+              } hover:border-[#C5A059]`}
             >
               <div className="absolute inset-0 bg-[#C5A059] opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none" />
               <div className="relative z-10">
@@ -78,11 +98,9 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                   <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#C5A059]">
                     {proj.category}
                   </span>
-                  {proj.isFeatured && (
-                    <span className="text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 bg-[#C5A059]/10 text-[#C5A059] border border-[#C5A059]/40">
-                      Centerpiece
-                    </span>
-                  )}
+                  <span className={`text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 border ${proj.badgeColor}`}>
+                    {proj.badgeText}
+                  </span>
                 </div>
 
                 <h3 

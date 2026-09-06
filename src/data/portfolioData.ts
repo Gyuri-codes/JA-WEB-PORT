@@ -191,6 +191,34 @@ export const MIND_MELD_CASE_STUDY = {
   ]
 };
 
+export const HORROR_GAME_CASE_STUDY = {
+  id: "the-house-that-remembers",
+  title: "THE HOUSE THAT REMEMBERS",
+  tagline: "An immersive first-person psychological horror web game inspired by classic browser horror experiences like Hotel 626.",
+  overview: "Step inside a chilling atmospheric narrative where rooms shift, memories echo, and tension builds through sound design and first-person exploration. Built as a browser experience paying homage to classic psychological horror games.",
+  officialUrl: "https://gyuri-codes.github.io/The-House-That-Remembers/",
+  genre: "Psychological Horror / Interactive Narrative",
+  inspiration: "Classic browser horror (Hotel 626) & modern psychological thrillers",
+  features: [
+    {
+      title: "Atmospheric Soundscapes",
+      description: "Positional audio cues, whispering echoes, and sudden dynamic sound design that heighten tension."
+    },
+    {
+      title: "First-Person Exploration",
+      description: "Navigate darkened hallways, examine haunted artifacts, and piece together fragmented memories."
+    },
+    {
+      title: "Psychological Suspense",
+      description: "Subtle environmental distortions, shifting light, and psychological dread that keep players on edge."
+    },
+    {
+      title: "Instant Browser Play",
+      description: "Zero installation required—fully optimized for modern web browsers on GitHub Pages."
+    }
+  ]
+};
+
 export const HOW_I_THINK_STEPS = [
   {
     worldA: "Hospitality",

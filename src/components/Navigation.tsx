@@ -28,7 +28,7 @@ export function Navigation({
       setIsScrolled(window.scrollY > 40);
 
       // Simple active section spy
-      const sections = ['hero', 'about', 'experience', 'skills', 'certifications', 'projects', 'mind-meld', 'contact'];
+      const sections = ['hero', 'about', 'experience', 'skills', 'certifications', 'projects', 'the-house', 'mind-meld', 'contact'];
       const scrollPos = window.scrollY + 200;
       for (const section of sections) {
         const el = document.getElementById(section);
@@ -54,6 +54,7 @@ export function Navigation({
     { id: 'skills', label: 'Skills' },
     { id: 'certifications', label: 'Certifications' },
     { id: 'projects', label: 'Projects' },
+    { id: 'the-house', label: 'Horror Game' },
     { id: 'mind-meld', label: 'Mind Meld' },
     { id: 'contact', label: 'Contact' },
   ];
