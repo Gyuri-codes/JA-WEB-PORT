@@ -87,6 +87,20 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
 
         {/* Subtle Secondary Project Links */}
         <div className="mb-14 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href="https://gyuri-codes.github.io/RURU/"
+            target="_blank"
+            rel="noopener noreferrer"
+            id="hero-ruru-link"
+            className="inline-flex items-center gap-2 text-xs text-[#88c0d0] hover:text-white transition-colors group px-4 py-2 border border-[#1f3a4d] bg-[#0c161f] hover:bg-[#132330] shadow-sm cursor-pointer"
+          >
+            <Compass className="w-3.5 h-3.5 text-[#88c0d0] transition-transform group-hover:rotate-45" />
+            <span className="uppercase tracking-[0.2em] font-medium">
+              Featured: RURU Night Journey
+            </span>
+            <span className="text-[#6d8a9e] font-light lowercase">(3D WebGL)</span>
+          </a>
+
           <button
             onClick={() => document.getElementById('the-house')?.scrollIntoView({ behavior: 'smooth' })}
             id="hero-the-house-link"
@@ -94,7 +108,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           >
             <Ghost className="w-3.5 h-3.5 text-[#ff6b6b] transition-transform group-hover:scale-110" />
             <span className="uppercase tracking-[0.2em] font-medium">
-              New: The House That Remembers
+              The House That Remembers
             </span>
             <span className="text-[#888888] font-light lowercase">(horror web game)</span>
           </button>

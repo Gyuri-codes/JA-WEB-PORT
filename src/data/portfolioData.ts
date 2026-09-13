@@ -219,6 +219,23 @@ export const HORROR_GAME_CASE_STUDY = {
   ]
 };
 
+export const RURU_PROJECT_DATA = {
+  id: "ruru-night-journey",
+  title: "RURU (流々) — Interactive Night Journey",
+  tagline: "An interactive cinematic scroll-driven Three.js night journey through an ancient cedar-surrounded Japanese mountain sanctuary.",
+  overview: "A five-chapter nocturnal meditation through a Kyoto mountain temple sanctuary. Inspired by Meng To's interactive 3D WebGL paradigm, rendered entirely in real-time procedural Three.js with spatial Web Audio.",
+  officialUrl: "https://gyuri-codes.github.io/RURU/",
+  category: "Cinematic 3D Web Experience",
+  genre: "Interactive 3D / Audio-Visual Narrative",
+  tools: ["Three.js", "WebGL", "TypeScript", "Web Audio", "Cinematic Scroll"],
+  highlights: [
+    "Procedural 3D Japanese temple architecture & cedar forest",
+    "Scroll-driven cinematic camera choreographies across 5 chapters",
+    "Subtle ambient audio synthesizer & nocturnal soundscape",
+    "Zero-install browser experience deployed to GitHub Pages"
+  ]
+};
+
 export const HOW_I_THINK_STEPS = [
   {
     worldA: "Hospitality",
