@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Download, User, RefreshCw, CheckCircle2, ShieldCheck, Grid, Save, Undo2 } from 'lucide-react';
+import { Sword, Upload, Download, User, RefreshCw, CheckCircle2, ShieldCheck, Grid, Save, Undo2 } from 'lucide-react';
 import { processStudioBackgroundRemoval } from '../utils/portraitProcessing';
 import { savePortraitToStorage, loadPortraitFromStorage, clearPortraitFromStorage } from '../utils/portraitStorage';
 
@@ -16,7 +16,9 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [backdropMode, setBackdropMode] = useState<PreviewBackdrop>('card');
   const [isSaved, setIsSaved] = useState<boolean>(true);
+  const [controlsVisible, setControlsVisible] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const rawBase = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/';
   const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
@@ -28,6 +30,37 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
     '/assets/jeric-portrait.png',
     '/jeric-portrait.png',
   ];
+
+  // Helper: Clear inactivity timer
+  const clearInactivityTimer = () => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  };
+
+  // Helper: Reset & start the 3-second inactivity countdown
+  const resetInactivityTimer = () => {
+    clearInactivityTimer();
+    if (portraitUrl && !isProcessing) {
+      inactivityTimerRef.current = setTimeout(() => {
+        setControlsVisible(false);
+      }, 3000);
+    }
+  };
+
+  // Helper: Show controls and restart the 3s timer
+  const showControls = () => {
+    setControlsVisible(true);
+    resetInactivityTimer();
+  };
+
+  // Handle any user activity on active controls to prevent them hiding mid-use
+  const handleUserActivity = () => {
+    if (controlsVisible) {
+      resetInactivityTimer();
+    }
+  };
 
   // 1. Initial Load: IndexedDB / persistent storage first, then default clean assets
   useEffect(() => {
@@ -66,8 +99,20 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
 
     return () => {
       isMounted = false;
+      clearInactivityTimer();
     };
   }, []);
+
+  // Timer lifecycle on portrait load or processing change
+  useEffect(() => {
+    if (portraitUrl && !isProcessing) {
+      setControlsVisible(true);
+      resetInactivityTimer();
+    }
+    return () => {
+      clearInactivityTimer();
+    };
+  }, [portraitUrl, isProcessing]);
 
   // 2. Automated & Manual Save Routine
   const persistPortrait = async (dataUrl: string, manual = false) => {
@@ -79,12 +124,14 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
       setStatusMessage('Profile Photo Saved.');
     }
     if (onSaveConfirmed) onSaveConfirmed();
+    resetInactivityTimer();
     setTimeout(() => setStatusMessage(null), 3500);
   };
 
   // Manual save handler for the dedicated SAVE button
   const handleManualSave = async () => {
     if (!portraitUrl) return;
+    resetInactivityTimer();
 
     // If already dataUrl, save directly
     if (portraitUrl.startsWith('data:image/png')) {
@@ -110,6 +157,8 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
   // 3. File Processing with Studio Precision (Hair Inspection + Halo Elimination)
   const processSelectedFile = async (file: File) => {
     setIsProcessing(true);
+    setControlsVisible(true);
+    clearInactivityTimer();
     setStatusMessage('Removing background & inspecting hair strands...');
     try {
       const reader = new FileReader();
@@ -140,6 +189,7 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
             setPortraitUrl(dataUrl);
             await persistPortrait(dataUrl, false);
             setIsProcessing(false);
+            resetInactivityTimer();
             return;
           }
         }
@@ -166,6 +216,7 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
       setTimeout(() => setStatusMessage(null), 4000);
     } finally {
       setIsProcessing(false);
+      resetInactivityTimer();
     }
   };
 
@@ -193,6 +244,7 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
 
   const handleDownloadPng = () => {
     if (!portraitUrl) return;
+    resetInactivityTimer();
     const link = document.createElement('a');
     link.download = 'jeric-abestano-transparent-portrait.png';
     link.href = portraitUrl;
@@ -204,6 +256,8 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
     // Revert to clean default asset
     setPortraitUrl('/jeric-portrait.png');
     setIsSaved(true);
+    setControlsVisible(true);
+    resetInactivityTimer();
     setStatusMessage('Default Profile Photo Restored.');
     setTimeout(() => setStatusMessage(null), 3000);
   };
@@ -213,6 +267,9 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
       className={`relative flex flex-col items-center justify-end w-full ${className}`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
+      onMouseMove={handleUserActivity}
+      onTouchStart={handleUserActivity}
+      onClick={handleUserActivity}
       id="profile-portrait-container"
     >
       <input
@@ -226,7 +283,7 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
 
       {/* Main Portrait Frame with Backdrop Quality Inspector */}
       <div
-        className={`relative w-full aspect-[4/5] sm:aspect-square max-w-[320px] mx-auto flex items-end justify-center overflow-hidden rounded-sm transition-colors duration-300 border border-[#2A2A2A] shadow-2xl ${
+        className={`relative w-full aspect-[4/5] max-w-[320px] mx-auto flex items-end justify-center overflow-hidden rounded-sm transition-colors duration-300 border border-[#2A2A2A] shadow-2xl ${
           backdropMode === 'black'
             ? 'bg-black'
             : backdropMode === 'checkerboard'
@@ -235,8 +292,8 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
         }`}
       >
         {portraitUrl ? (
-          <div className="relative w-full h-full flex items-end justify-center">
-            {/* The 100% untouched subject on transparent background */}
+          <div className="relative w-full h-full flex items-end justify-center overflow-hidden">
+            {/* The 100% untouched subject on transparent background properly filling the profile box */}
             <img
               src={portraitUrl}
               alt="Jeric Abestano - Authentic Portrait Cutout"
@@ -253,7 +310,10 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
 
             {/* Seamless gradient blend at card base */}
             {backdropMode === 'card' && (
-              <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-[#1A1A1A] to-transparent pointer-events-none" />
+              <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-[#181818] to-transparent pointer-events-none" />
+            )}
+            {backdropMode === 'black' && (
+              <div className="absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-black to-transparent pointer-events-none" />
             )}
           </div>
         ) : (
@@ -290,19 +350,54 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
           </div>
         )}
 
-        {/* Quality Guarantee Badge */}
+        {/* Subtle Minimal Sword Icon (Appears in Top-Left Corner when controls are hidden) */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            showControls();
+          }}
+          aria-label="Show photo controls"
+          title="Show photo controls"
+          className={`absolute top-3.5 left-3.5 z-30 w-8 h-8 rounded-[3px] bg-[#141414]/90 hover:bg-[#1f1f1f] text-[#C5A059] border border-[#C5A059]/70 hover:border-[#C5A059] shadow-lg backdrop-blur-sm transition-all duration-300 cursor-pointer group flex items-center justify-center ${
+            !controlsVisible && portraitUrl && !isProcessing
+              ? 'opacity-100 scale-100 pointer-events-auto'
+              : 'opacity-0 scale-75 pointer-events-none'
+          }`}
+          id="show-photo-controls-btn"
+        >
+          <Sword className="w-4 h-4 text-[#C5A059] transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105" />
+          <span className="sr-only">Show photo controls</span>
+        </button>
+
+        {/* Quality Guarantee Badge (Fades out when controls auto-hide) */}
         {portraitUrl && !isProcessing && (
-          <div className="absolute top-2 left-2 bg-[#121212]/90 border border-[#C5A059]/30 backdrop-blur-md px-2 py-0.5 rounded-xs flex items-center gap-1 text-[9px] text-[#C5A059] z-20 shadow-sm pointer-events-none">
+          <div
+            className={`absolute top-3.5 left-3.5 bg-[#121212]/90 border border-[#C5A059]/30 backdrop-blur-md px-2 py-0.5 rounded-xs flex items-center gap-1 text-[9px] text-[#C5A059] z-20 shadow-sm pointer-events-none transition-all duration-300 ${
+              controlsVisible
+                ? 'opacity-100 translate-y-0 pointer-events-auto'
+                : 'opacity-0 -translate-y-2 pointer-events-none'
+            }`}
+          >
             <ShieldCheck className="w-2.5 h-2.5" />
             <span>0 Halos · Authentic Subject</span>
           </div>
         )}
 
-        {/* Backdrop Inspector Selector (Top Right) */}
+        {/* Backdrop Inspector Selector: Card | Grid | Black (Fades out when controls auto-hide) */}
         {portraitUrl && !isProcessing && (
-          <div className="absolute top-2 right-2 flex items-center bg-[#141414]/90 border border-[#333333] rounded-xs p-0.5 gap-0.5 z-20 shadow-md">
+          <div
+            className={`absolute top-3.5 right-3.5 flex items-center bg-[#141414]/90 border border-[#333333] rounded-xs p-0.5 gap-0.5 z-20 shadow-md transition-all duration-300 ${
+              controlsVisible
+                ? 'opacity-100 translate-y-0 pointer-events-auto'
+                : 'opacity-0 -translate-y-2 pointer-events-none'
+            }`}
+          >
             <button
-              onClick={() => setBackdropMode('card')}
+              onClick={() => {
+                setBackdropMode('card');
+                resetInactivityTimer();
+              }}
               className={`px-1.5 py-0.5 text-[9px] rounded-xs transition-colors cursor-pointer ${
                 backdropMode === 'card'
                   ? 'bg-[#C5A059] text-black font-semibold'
@@ -313,7 +408,10 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
               Card
             </button>
             <button
-              onClick={() => setBackdropMode('checkerboard')}
+              onClick={() => {
+                setBackdropMode('checkerboard');
+                resetInactivityTimer();
+              }}
               className={`px-1.5 py-0.5 text-[9px] rounded-xs transition-colors cursor-pointer flex items-center gap-0.5 ${
                 backdropMode === 'checkerboard'
                   ? 'bg-[#C5A059] text-black font-semibold'
@@ -325,7 +423,10 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
               <span>Grid</span>
             </button>
             <button
-              onClick={() => setBackdropMode('black')}
+              onClick={() => {
+                setBackdropMode('black');
+                resetInactivityTimer();
+              }}
               className={`px-1.5 py-0.5 text-[9px] rounded-xs transition-colors cursor-pointer ${
                 backdropMode === 'black'
                   ? 'bg-[#C5A059] text-black font-semibold'
@@ -339,56 +440,70 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
         )}
       </div>
 
-      {/* Prominent Action Bar: SAVE button, Replace, Download, Reset */}
-      <div className="w-full max-w-[320px] mt-3 space-y-2">
-        {/* Primary Row: Clearly Visible SAVE button & Replace */}
-        <div className="flex items-center gap-2">
-          {portraitUrl && (
-            <button
-              onClick={handleManualSave}
-              className="flex-1 py-1.5 px-3 bg-[#C5A059] hover:bg-[#d6b26b] text-[#0F0F0F] text-[10px] uppercase tracking-[0.15em] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-              title="Manually save/confirm profile photo to portfolio"
-              id="save-profile-portrait-btn"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>SAVE</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className={`py-1.5 px-3 border border-[#3A3A3A] hover:border-[#C5A059] bg-[#1A1A1A] hover:bg-[#222222] text-[#E0E0E0] text-[10px] uppercase tracking-[0.15em] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-              portraitUrl ? 'flex-1' : 'w-full'
-            }`}
-            title="Upload new or updated photo"
-          >
-            <Upload className="w-3.5 h-3.5 text-[#C5A059]" />
-            <span>{portraitUrl ? 'Replace Photo' : 'Upload Photo'}</span>
-          </button>
-        </div>
-
-        {/* Secondary Row: Download PNG & Reset */}
-        {portraitUrl && (
-          <div className="flex items-center justify-between px-1 text-[10px] text-[#888888] border-t border-[#222222] pt-1.5">
-            <button
-              onClick={handleDownloadPng}
-              className="text-[#C5A059] hover:text-[#e5bf70] font-medium transition-colors flex items-center gap-1 cursor-pointer py-0.5"
-              title="Download 32-bit transparent PNG"
-            >
-              <Download className="w-3 h-3" />
-              <span>Download Transparent PNG</span>
-            </button>
+      {/* Prominent Action Bar: SAVE button, Replace, Download, Reset (Smoothly auto-hides after 3s) */}
+      <div
+        className={`w-full max-w-[320px] transition-all duration-400 ease-in-out ${
+          controlsVisible && portraitUrl && !isProcessing
+            ? 'opacity-100 max-h-36 mt-3 pointer-events-auto translate-y-0'
+            : 'opacity-0 max-h-0 mt-0 pointer-events-none -translate-y-1 overflow-hidden'
+        }`}
+        onMouseEnter={resetInactivityTimer}
+        onMouseMove={resetInactivityTimer}
+        onClick={resetInactivityTimer}
+      >
+        <div className="space-y-2">
+          {/* Primary Row: Clearly Visible SAVE button & Replace */}
+          <div className="flex items-center gap-2">
+            {portraitUrl && (
+              <button
+                onClick={handleManualSave}
+                className="flex-1 py-1.5 px-3 bg-[#C5A059] hover:bg-[#d6b26b] text-[#0F0F0F] text-[10px] uppercase tracking-[0.15em] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                title="Manually save/confirm profile photo to portfolio"
+                id="save-profile-portrait-btn"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>SAVE</span>
+              </button>
+            )}
 
             <button
-              onClick={handleReset}
-              className="text-[#777777] hover:text-[#C5A059] transition-colors flex items-center gap-1 cursor-pointer py-0.5"
-              title="Reset to default original profile photo"
+              onClick={() => {
+                resetInactivityTimer();
+                fileInputRef.current?.click();
+              }}
+              className={`py-1.5 px-3 border border-[#3A3A3A] hover:border-[#C5A059] bg-[#1A1A1A] hover:bg-[#222222] text-[#E0E0E0] text-[10px] uppercase tracking-[0.15em] font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                portraitUrl ? 'flex-1' : 'w-full'
+              }`}
+              title="Upload new or updated photo"
             >
-              <Undo2 className="w-3 h-3" />
-              <span>Reset</span>
+              <Upload className="w-3.5 h-3.5 text-[#C5A059]" />
+              <span>{portraitUrl ? 'Replace Photo' : 'Upload Photo'}</span>
             </button>
           </div>
-        )}
+
+          {/* Secondary Row: Download PNG & Reset */}
+          {portraitUrl && (
+            <div className="flex items-center justify-between px-1 text-[10px] text-[#888888] border-t border-[#222222] pt-1.5">
+              <button
+                onClick={handleDownloadPng}
+                className="text-[#C5A059] hover:text-[#e5bf70] font-medium transition-colors flex items-center gap-1 cursor-pointer py-0.5"
+                title="Download 32-bit transparent PNG"
+              >
+                <Download className="w-3 h-3" />
+                <span>Download Transparent PNG</span>
+              </button>
+
+              <button
+                onClick={handleReset}
+                className="text-[#777777] hover:text-[#C5A059] transition-colors flex items-center gap-1 cursor-pointer py-0.5"
+                title="Reset to default original profile photo"
+              >
+                <Undo2 className="w-3 h-3" />
+                <span>Reset</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Status Notification Toast */}
@@ -401,3 +516,4 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
     </div>
   );
 }
+
