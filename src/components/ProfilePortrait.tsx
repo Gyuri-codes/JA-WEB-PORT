@@ -293,12 +293,12 @@ export function ProfilePortrait({ className = '', onSaveConfirmed }: ProfilePort
       >
         {portraitUrl ? (
           <div className="relative w-full h-full flex items-end justify-center overflow-hidden">
-            {/* The 100% untouched subject on transparent background properly filling the profile box */}
+            {/* The 100% untouched subject on transparent background aligned near top with clean breathing room */}
             <img
               src={portraitUrl}
               alt="Jeric Abestano - Authentic Portrait Cutout"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain object-bottom select-none transition-transform duration-500 hover:scale-[1.01]"
+              className="w-full h-full object-contain object-bottom select-none origin-bottom scale-[1.17] transition-transform duration-500 hover:scale-[1.18]"
               style={{
                 // Drop shadow only on standard card mode, never on black/grid test backdrops
                 filter:
