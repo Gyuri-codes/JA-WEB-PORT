@@ -1,6 +1,7 @@
 import { GraduationCap, MapPin, Heart, Flame, Sparkles, BookOpen, FileText } from 'lucide-react';
 import { ThemeId } from '../types';
 import { PERSONAL_INFO, UNEXPECTED_PILLARS, THEME_CONFIGS } from '../data/portfolioData';
+import { ProfilePortrait } from './ProfilePortrait';
 
 interface AboutSectionProps {
   currentTheme: ThemeId;
@@ -32,36 +33,46 @@ export function AboutSection({ currentTheme, onOpenResume }: AboutSectionProps) 
         {/* Profile Card & Credibility Highlights */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch mb-20">
           {/* Identity Card */}
-          <div className="lg:col-span-5 p-8 bg-[#1A1A1A] border border-[#333333] flex flex-col justify-between relative overflow-hidden shadow-2xl group">
+          <div className="lg:col-span-7 p-8 sm:p-10 bg-[#1A1A1A] border border-[#333333] flex flex-col justify-between relative overflow-hidden shadow-2xl group">
             <div className="absolute inset-0 bg-[#C5A059] opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none" />
             <div className="relative z-10">
-              <div className="w-14 h-14 border border-[#C5A059] bg-[#141414] flex items-center justify-center text-xl font-serif italic text-[#C5A059] mb-6 shadow-md">
-                JA
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                {/* Left Info Column */}
+                <div className="sm:col-span-7">
+                  <div className="w-14 h-14 border border-[#C5A059] bg-[#141414] flex items-center justify-center text-xl font-serif italic text-[#C5A059] mb-6 shadow-md">
+                    JA
+                  </div>
 
-              <span className="text-[9px] uppercase tracking-[0.3em] text-[#888888] block mb-1">Undergraduate Profile</span>
-              <h3 
-                className="text-2xl sm:text-3xl font-serif italic font-light text-white mb-1"
-                style={{ fontFamily: themeConfig.fontHeadline }}
-              >
-                {PERSONAL_INFO.name}
-              </h3>
-              <div className="text-xs uppercase tracking-[0.2em] font-medium text-[#C5A059] mb-5">
-                {PERSONAL_INFO.education.degree}
-              </div>
+                  <span className="text-[9px] uppercase tracking-[0.3em] text-[#888888] block mb-1">Undergraduate Profile</span>
+                  <h3 
+                    className="text-2xl sm:text-3xl font-serif italic font-light text-white mb-1"
+                    style={{ fontFamily: themeConfig.fontHeadline }}
+                  >
+                    {PERSONAL_INFO.name}
+                  </h3>
+                  <div className="text-xs uppercase tracking-[0.2em] font-medium text-[#C5A059] mb-5">
+                    {PERSONAL_INFO.education.degree}
+                  </div>
 
-              <div className="space-y-3.5 text-xs text-[#999999] border-t border-[#262626] pt-5">
-                <div className="flex items-center gap-3">
-                  <GraduationCap className="w-4 h-4 text-[#C5A059] shrink-0" />
-                  <span>{PERSONAL_INFO.education.institution} · <strong className="text-white font-medium">{PERSONAL_INFO.education.status}</strong></span>
+                  <div className="space-y-3.5 text-xs text-[#999999] border-t border-[#262626] pt-5">
+                    <div className="flex items-center gap-3">
+                      <GraduationCap className="w-4 h-4 text-[#C5A059] shrink-0" />
+                      <span>{PERSONAL_INFO.education.institution} · <strong className="text-white font-medium">{PERSONAL_INFO.education.status}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-4 h-4 text-[#C5A059] shrink-0" />
+                      <span>{PERSONAL_INFO.education.location}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <BookOpen className="w-4 h-4 text-[#C5A059] shrink-0" />
+                      <span>Languages: <strong className="text-[#E0E0E0]">{PERSONAL_INFO.languages.join(' & ')}</strong></span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <MapPin className="w-4 h-4 text-[#C5A059] shrink-0" />
-                  <span>{PERSONAL_INFO.education.location}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <BookOpen className="w-4 h-4 text-[#C5A059] shrink-0" />
-                  <span>Languages: <strong className="text-[#E0E0E0]">{PERSONAL_INFO.languages.join(' & ')}</strong></span>
+
+                {/* Right Portrait Column - Pristine transparent background subject */}
+                <div className="sm:col-span-5 flex flex-col items-center justify-end">
+                  <ProfilePortrait />
                 </div>
               </div>
             </div>
@@ -78,7 +89,7 @@ export function AboutSection({ currentTheme, onOpenResume }: AboutSectionProps) 
           </div>
 
           {/* Narrative & Grounding */}
-          <div className="lg:col-span-7 p-8 sm:p-10 bg-[#141414] border border-[#333333] flex flex-col justify-center shadow-xl">
+          <div className="lg:col-span-5 p-8 sm:p-10 bg-[#141414] border border-[#333333] flex flex-col justify-center shadow-xl">
             <span className="text-[10px] uppercase tracking-[0.4em] text-[#C5A059] block mb-3">Service Philosophy</span>
             <h4 className="text-xl sm:text-2xl font-serif italic text-white mb-5 leading-snug">
               Grounding in Guest Care, Reaching into Digital Craft.
