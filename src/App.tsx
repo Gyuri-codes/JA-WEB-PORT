@@ -9,6 +9,7 @@ import { ExperienceSection } from './components/ExperienceSection';
 import { SkillsSection } from './components/SkillsSection';
 import { CertificationsSection } from './components/CertificationsSection';
 import { ProjectsSection } from './components/ProjectsSection';
+import { EmberfallSection } from './components/EmberfallSection';
 import { HorrorGameSection } from './components/HorrorGameSection';
 import { MindMeldSection } from './components/MindMeldSection';
 import { HowIThinkSection } from './components/HowIThinkSection';
@@ -139,6 +140,7 @@ export default function App() {
         <SkillsSection currentTheme={currentTheme} />
         <CertificationsSection currentTheme={currentTheme} />
         <ProjectsSection currentTheme={currentTheme} />
+        <EmberfallSection currentTheme={currentTheme} />
         <HorrorGameSection currentTheme={currentTheme} />
         <MindMeldSection currentTheme={currentTheme} />
         <HowIThinkSection currentTheme={currentTheme} />

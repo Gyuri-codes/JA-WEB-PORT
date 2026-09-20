@@ -236,6 +236,35 @@ export const RURU_PROJECT_DATA = {
   ]
 };
 
+export const EMBERFALL_PROJECT_DATA = {
+  id: "emberfall-guardians",
+  title: "EMBERFALL: GUARDIANS OF THE LAST REALM",
+  tagline: "When the realms fall, the guardians awaken. An epic Donghua-inspired Tower Defense web game.",
+  overview: "An epic Donghua-inspired Tower Defense web game featuring legendary cultivator guardians, elemental abilities, deep cultivation skill trees, realm defense campaigns, and cinematic boss battles.",
+  officialUrl: "https://gyuri-codes.github.io/EMBERFALL/",
+  category: "Donghua Cultivator Tower Defense",
+  genre: "Tower Defense / Xianxia Interactive Web Game",
+  tools: ["React", "TypeScript", "Canvas / WebGL", "Tailwind CSS", "Donghua Art", "GitHub Pages"],
+  highlights: [
+    "Deploy legendary elemental cultivator guardians (Ignis, Gale, Glacial, Thunder & Void Sovereign)",
+    "Deep cultivation skill trees across 6 ranks from Qi Condensation to Immortal Sovereign",
+    "Dynamic realm defense maps including Emberfall Valley, Jade Serene River, and Abyssal Realm",
+    "Instant playable web game with zero installation deployed to GitHub Pages"
+  ],
+  realms: [
+    { name: "Emberfall Valley", desc: "First bastion where fallen meteors and blazing qi test young cultivators.", power: "Qi Condensation" },
+    { name: "Jade Serene River", desc: "Emerald dragon waters and mist-shrouded bamboo groves.", power: "Foundation Realm" },
+    { name: "Abyssal Realm", desc: "The corrupted nether void harboring otherworldly shadow fiends.", power: "Core Formation" },
+    { name: "Nine Heavens Tribulation", desc: "Celestial lightning trial where immortals ascend beyond mortality.", power: "Heavenly Ascension" }
+  ],
+  guardians: [
+    { name: "Ignis Sovereign", element: "Flame Dao", role: "High AoE burst damage & burning fields" },
+    { name: "Jade Serene Gale", element: "Wind Dao", role: "Rapid crowd control & vortex slowing" },
+    { name: "Glacial Immortal", element: "Ice Dao", role: "Freezing permafrost & barrier shields" },
+    { name: "Thunder Sovereign", element: "Lightning Dao", role: "Chain lightning & armor penetration" }
+  ]
+};
+
 export const HOW_I_THINK_STEPS = [
   {
     worldA: "Hospitality",

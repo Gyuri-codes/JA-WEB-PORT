@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost, Compass, Eye, X, Maximize2, Moon } from 'lucide-react';
+import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost, Compass, Eye, X, Maximize2, Moon, Flame } from 'lucide-react';
 import { ThemeId } from '../types';
-import { PERSONAL_INFO, THEME_CONFIGS, HORROR_GAME_CASE_STUDY, RURU_PROJECT_DATA } from '../data/portfolioData';
+import { PERSONAL_INFO, THEME_CONFIGS, HORROR_GAME_CASE_STUDY, RURU_PROJECT_DATA, EMBERFALL_PROJECT_DATA } from '../data/portfolioData';
 
 interface ProjectsSectionProps {
   currentTheme: ThemeId;
@@ -13,6 +13,21 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
   const [previewProject, setPreviewProject] = useState<{ title: string; url: string } | null>(null);
 
   const projects = [
+    {
+      id: "emberfall-guardians",
+      title: "EMBERFALL: GUARDIANS OF THE LAST REALM",
+      category: "Donghua Cultivator Tower Defense",
+      filterCategory: "interactive",
+      tagline: "An epic Donghua-inspired Tower Defense web game featuring legendary cultivator guardians, elemental abilities, deep cultivation skill trees, and cinematic boss battles.",
+      tools: ["React", "TypeScript", "Canvas / WebGL", "Donghua Art", "Skill Trees", "GitHub Pages"],
+      isFeatured: true,
+      badgeText: "Featured Game",
+      badgeColor: "text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/40",
+      accentBorder: "border-[#f59e0b]/80",
+      link: EMBERFALL_PROJECT_DATA.officialUrl,
+      actionText: "Play Emberfall Live",
+      canPreview: true
+    },
     {
       id: "ruru-night-journey",
       title: "RURU (流々) — Interactive Night Journey",
@@ -95,6 +110,9 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
     return p.filterCategory === activeFilter;
   });
 
+  const interactiveCount = projects.filter((p) => p.filterCategory === 'interactive').length;
+  const hospitalityCount = projects.filter((p) => p.filterCategory === 'hospitality').length;
+
   return (
     <section id="projects" className="py-24 px-4 sm:px-6 lg:px-8 relative z-10 border-t border-[#222222]">
       <div className="max-w-6xl mx-auto">
@@ -135,7 +153,7 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                   : 'bg-[#141414] text-[#888888] border-[#2A2A2A] hover:border-[#444] hover:text-white'
               }`}
             >
-              Interactive & 3D (3)
+              Interactive & 3D ({interactiveCount})
             </button>
             <button
               type="button"
@@ -146,7 +164,7 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                   : 'bg-[#141414] text-[#888888] border-[#2A2A2A] hover:border-[#444] hover:text-white'
               }`}
             >
-              Hospitality Systems (2)
+              Hospitality Systems ({hospitalityCount})
             </button>
           </div>
         </div>

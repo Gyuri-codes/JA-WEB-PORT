@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake, Ghost } from 'lucide-react';
+import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake, Ghost, Flame } from 'lucide-react';
 import { ThemeId } from '../types';
 import { PERSONAL_INFO, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -87,6 +87,18 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
 
         {/* Subtle Secondary Project Links */}
         <div className="mb-14 flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => document.getElementById('emberfall')?.scrollIntoView({ behavior: 'smooth' })}
+            id="hero-emberfall-link"
+            className="inline-flex items-center gap-2 text-xs text-[#f59e0b] hover:text-white transition-colors group px-4 py-2 border border-[#b45309]/50 bg-[#291405]/80 hover:bg-[#3d1e08] shadow-sm cursor-pointer"
+          >
+            <Flame className="w-3.5 h-3.5 text-[#f59e0b] transition-transform group-hover:scale-110" />
+            <span className="uppercase tracking-[0.2em] font-medium">
+              Featured: Emberfall
+            </span>
+            <span className="text-[#d97706] font-light lowercase">(tower defense)</span>
+          </button>
+
           <a
             href="https://gyuri-codes.github.io/RURU/"
             target="_blank"
