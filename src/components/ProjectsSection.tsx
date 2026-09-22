@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost, Compass, Eye, X, Maximize2, Moon, Flame } from 'lucide-react';
+import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost, Compass, Eye, X, Maximize2, Moon, Flame, Palmtree } from 'lucide-react';
 import { ThemeId } from '../types';
-import { PERSONAL_INFO, THEME_CONFIGS, HORROR_GAME_CASE_STUDY, RURU_PROJECT_DATA, EMBERFALL_PROJECT_DATA } from '../data/portfolioData';
+import { PERSONAL_INFO, THEME_CONFIGS, HORROR_GAME_CASE_STUDY, RURU_PROJECT_DATA, EMBERFALL_PROJECT_DATA, ALON_ANINAG_PROJECT_DATA } from '../data/portfolioData';
 
 interface ProjectsSectionProps {
   currentTheme: ThemeId;
@@ -13,6 +13,21 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
   const [previewProject, setPreviewProject] = useState<{ title: string; url: string } | null>(null);
 
   const projects = [
+    {
+      id: "alon-aninag",
+      title: "Alon Aninag Boutique Beach Resort",
+      category: "Boutique Beach Resort Web Concept",
+      filterCategory: ['hospitality', 'interactive'],
+      tagline: "Boutique beachfront sanctuary in Poblacion Beach, Sipalay City, Negros Occidental. \"Where Waves Rest and Souls Glow.\"",
+      tools: ["Hospitality Branding", "Boutique Resort UI", "Tailwind CSS", "React / Web", "GitHub Pages"],
+      isFeatured: true,
+      badgeText: "Boutique Resort",
+      badgeColor: "text-[#2dd4bf] bg-[#2dd4bf]/10 border-[#2dd4bf]/40",
+      accentBorder: "border-[#2dd4bf]/80",
+      link: ALON_ANINAG_PROJECT_DATA.officialUrl,
+      actionText: "Explore Resort Site",
+      canPreview: true
+    },
     {
       id: "emberfall-guardians",
       title: "EMBERFALL: GUARDIANS OF THE LAST REALM",
@@ -107,11 +122,18 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
 
   const filteredProjects = projects.filter((p) => {
     if (activeFilter === 'all') return true;
+    if (Array.isArray(p.filterCategory)) {
+      return p.filterCategory.includes(activeFilter);
+    }
     return p.filterCategory === activeFilter;
   });
 
-  const interactiveCount = projects.filter((p) => p.filterCategory === 'interactive').length;
-  const hospitalityCount = projects.filter((p) => p.filterCategory === 'hospitality').length;
+  const interactiveCount = projects.filter((p) =>
+    Array.isArray(p.filterCategory) ? p.filterCategory.includes('interactive') : p.filterCategory === 'interactive'
+  ).length;
+  const hospitalityCount = projects.filter((p) =>
+    Array.isArray(p.filterCategory) ? p.filterCategory.includes('hospitality') : p.filterCategory === 'hospitality'
+  ).length;
 
   return (
     <section id="projects" className="py-24 px-4 sm:px-6 lg:px-8 relative z-10 border-t border-[#222222]">
@@ -128,7 +150,7 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
             Featured Works & Initiatives
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] max-w-xl mx-auto font-light leading-relaxed">
-            Tangible outcomes bridging hospitality service precision with real-time 3D web experiences and interactive games.
+            Tangible outcomes bridging hospitality service precision with real-time 3D web experiences, boutique resort concepts, and interactive games.
           </p>
 
           {/* Filter Navigation */}
@@ -153,18 +175,18 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                   : 'bg-[#141414] text-[#888888] border-[#2A2A2A] hover:border-[#444] hover:text-white'
               }`}
             >
-              Interactive & 3D ({interactiveCount})
+              Interactive & Web ({interactiveCount})
             </button>
             <button
               type="button"
               onClick={() => setActiveFilter('hospitality')}
               className={`px-4 py-1.5 text-[10px] uppercase tracking-[0.2em] font-medium border transition-colors cursor-pointer ${
                 activeFilter === 'hospitality'
-                  ? 'bg-[#C5A059] text-[#0F0F0F] border-[#C5A059] font-semibold'
+                  ? 'bg-[#2dd4bf] text-[#0F0F0F] border-[#2dd4bf] font-semibold'
                   : 'bg-[#141414] text-[#888888] border-[#2A2A2A] hover:border-[#444] hover:text-white'
               }`}
             >
-              Hospitality Systems ({hospitalityCount})
+              Hospitality & Resorts ({hospitalityCount})
             </button>
           </div>
         </div>

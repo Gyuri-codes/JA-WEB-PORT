@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake, Ghost, Flame } from 'lucide-react';
+import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake, Ghost, Flame, Palmtree } from 'lucide-react';
 import { ThemeId } from '../types';
 import { PERSONAL_INFO, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -87,6 +87,20 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
 
         {/* Subtle Secondary Project Links */}
         <div className="mb-14 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href="https://gyuri-codes.github.io/Alon-Aninag/"
+            target="_blank"
+            rel="noopener noreferrer"
+            id="hero-alon-aninag-link"
+            className="inline-flex items-center gap-2 text-xs text-[#2dd4bf] hover:text-white transition-colors group px-4 py-2 border border-[#0d5257] bg-[#072427]/80 hover:bg-[#0b383c] shadow-sm cursor-pointer"
+          >
+            <Palmtree className="w-3.5 h-3.5 text-[#2dd4bf] transition-transform group-hover:scale-110" />
+            <span className="uppercase tracking-[0.2em] font-medium">
+              Featured: Alon Aninag
+            </span>
+            <span className="text-[#14b8a6] font-light lowercase">(resort site)</span>
+          </a>
+
           <button
             onClick={() => document.getElementById('emberfall')?.scrollIntoView({ behavior: 'smooth' })}
             id="hero-emberfall-link"

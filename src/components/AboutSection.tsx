@@ -23,7 +23,7 @@ export function AboutSection({ currentTheme, onOpenResume }: AboutSectionProps) 
             className="text-3xl sm:text-5xl font-serif italic font-light text-white tracking-tight"
             style={{ fontFamily: themeConfig.fontHeadline }}
           >
-            Authentic Foundation. <span className="text-[#C5A059] not-italic">Driven by Curiosity.</span>
+            Grounded in Vision. <span className="text-[#C5A059] not-italic">Inspired by Possibility.</span>
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] leading-relaxed font-light">
             {PERSONAL_INFO.humblePositioning}
