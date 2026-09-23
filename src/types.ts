@@ -25,6 +25,8 @@ export interface CertificationItem {
   date: string;
   badgeLevel: string;
   description: string;
+  image?: string;
+  certificateFilename?: string;
 }
 
 export interface SkillCategory {

@@ -171,7 +171,7 @@ export function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
             <div className="flex items-center gap-2 border-b border-[#262626] pb-2 mb-3">
               <Award className="w-4 h-4 text-[#C5A059]" />
               <h3 className="text-[10px] uppercase tracking-[0.3em] text-[#C5A059] font-mono">
-                National Certifications (NC II)
+                National Certifications
               </h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

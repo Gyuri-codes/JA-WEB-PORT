@@ -105,7 +105,19 @@ export const CERTIFICATIONS: CertificationItem[] = [
     issuer: "Asian College",
     date: "March 26, 2026",
     badgeLevel: "National Certificate Level II",
-    description: "Certified proficiency in guest registration, reservations, front desk operations, and professional guest communication."
+    description: "Certified proficiency in guest registration, reservations, front desk operations, and professional guest communication.",
+    image: "assets/certificates/nc2-front-office.svg",
+    certificateFilename: "Messenger_creation_D9608875-2970-4258-B9C0-8FC653E6EF45.png"
+  },
+  {
+    id: "cert-event-management",
+    title: "NC III – Event Management Services",
+    issuer: "Asian College",
+    date: "July 15, 2025",
+    badgeLevel: "National Certificate Level III",
+    description: "Demonstrating competency in planning, coordinating, and supporting events and event-related operations.",
+    image: "assets/certificates/nc3-events-management.svg",
+    certificateFilename: "Messenger_creation_3EDB5EA7-CA91-4E1D-8C23-315B54ABF5B9.png"
   },
   {
     id: "cert-bread-pastry",
@@ -113,7 +125,9 @@ export const CERTIFICATIONS: CertificationItem[] = [
     issuer: "Asian College",
     date: "March 21, 2025",
     badgeLevel: "National Certificate Level II",
-    description: "Certified competence in baking techniques, confectionery production, portion control, and bakery hygiene."
+    description: "Certified competence in baking techniques, confectionery production, portion control, and bakery hygiene.",
+    image: "assets/certificates/nc2-bread-pastry.svg",
+    certificateFilename: "Messenger_creation_F799F610-55BC-41A5-993C-A07A4DC8C48B.png"
   },
   {
     id: "cert-cookery",
@@ -121,7 +135,9 @@ export const CERTIFICATIONS: CertificationItem[] = [
     issuer: "Asian College",
     date: "July 23, 2024",
     badgeLevel: "National Certificate Level II",
-    description: "Certified skills in professional culinary preparations, hot and cold kitchen handling, and plating standards."
+    description: "Certified skills in professional culinary preparations, hot and cold kitchen handling, and plating standards.",
+    image: "assets/certificates/nc2-cookery.svg",
+    certificateFilename: "Messenger_creation_D1ABDE9B-478E-4C9A-AE51-DA281ACE8ED1.png"
   },
   {
     id: "cert-fb-services",
@@ -129,7 +145,9 @@ export const CERTIFICATIONS: CertificationItem[] = [
     issuer: "Asian College",
     date: "July 17, 2024",
     badgeLevel: "National Certificate Level II",
-    description: "Certified mastery of dining room setup, formal table service, beverage presentation, and client relations."
+    description: "Certified mastery of dining room setup, formal table service, beverage presentation, and client relations.",
+    image: "assets/certificates/nc2-food-beverage.svg",
+    certificateFilename: "Messenger_creation_23B7BA81-4417-4C76-B75D-AF084BF07E36.png"
   },
   {
     id: "cert-housekeeping",
@@ -137,7 +155,9 @@ export const CERTIFICATIONS: CertificationItem[] = [
     issuer: "TESDA",
     date: "January 23, 2024",
     badgeLevel: "National Certificate Level II",
-    description: "TESDA-certified excellence in guest room maintenance, linen care, sanitation, and institutional housekeeping standards."
+    description: "TESDA-certified excellence in guest room maintenance, linen care, sanitation, and institutional housekeeping standards.",
+    image: "assets/certificates/nc2-housekeeping.svg",
+    certificateFilename: "Messenger_creation_F072B715-2C6F-4B02-98BD-A85383E1F7DD.png"
   }
 ];
 
