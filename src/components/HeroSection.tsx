@@ -57,7 +57,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           className="text-4xl sm:text-6xl md:text-7xl font-serif font-light tracking-tight text-white mb-6 leading-[1.05] sm:leading-[0.98] max-w-4xl mx-auto"
           style={{ fontFamily: themeConfig.fontHeadline }}
         >
-          I create <span className="italic font-normal text-[#C5A059]">experiences</span> people remember.
+          I create <span className="italic font-normal text-[#C5A059]">experiences</span> people remember
         </h1>
 
         {/* Supporting Text with Editorial Tone */}

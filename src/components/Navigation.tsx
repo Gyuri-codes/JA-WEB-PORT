@@ -96,7 +96,7 @@ export function Navigation({
             <span
               className="text-base sm:text-xl font-serif italic font-light tracking-tight text-[#C5A059] block leading-tight group-hover:text-white transition-colors"
             >
-              {PERSONAL_INFO.name}.
+              {PERSONAL_INFO.name}
             </span>
           </div>
         </button>

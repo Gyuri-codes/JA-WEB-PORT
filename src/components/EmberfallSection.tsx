@@ -119,7 +119,7 @@ export function EmberfallSection({ currentTheme }: EmberfallSectionProps) {
                   className="text-2xl sm:text-4xl font-serif italic text-white mb-4 leading-tight"
                   style={{ fontFamily: themeConfig.fontHeadline }}
                 >
-                  Command legendary cultivator guardians to protect the mortal plane from void fiends.
+                  Command legendary cultivator guardians to protect the mortal plane from void fiends
                 </h3>
                 <p className="text-xs sm:text-sm text-[#cccccc] leading-relaxed mb-6 font-light max-w-2xl">
                   Construct elemental defense formations, trigger ultimate domain expansions, harness spiritual qi paths, and level up guardians across six transcendental cultivation realms in a complete, responsive browser game.

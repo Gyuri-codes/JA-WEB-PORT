@@ -21,7 +21,7 @@ export function HowIThinkSection({ currentTheme }: HowIThinkSectionProps) {
             className="text-3xl sm:text-5xl font-serif italic font-light text-white tracking-tight"
             style={{ fontFamily: themeConfig.fontHeadline }}
           >
-            “I’m interested in what happens when different worlds meet.”
+            “I’m interested in what happens when different worlds meet”
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] max-w-xl mx-auto font-light leading-relaxed">
             Where human empathy and digital tools elevate one another into something memorable.

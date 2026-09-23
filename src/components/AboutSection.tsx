@@ -23,7 +23,7 @@ export function AboutSection({ currentTheme, onOpenResume }: AboutSectionProps) 
             className="text-3xl sm:text-5xl font-serif italic font-light text-white tracking-tight"
             style={{ fontFamily: themeConfig.fontHeadline }}
           >
-            Grounded in Vision. <span className="text-[#C5A059] not-italic">Inspired by Possibility.</span>
+            Grounded in Vision <span className="text-[#C5A059] not-italic">Inspired by Possibility</span>
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] leading-relaxed font-light">
             {PERSONAL_INFO.humblePositioning}
@@ -92,7 +92,7 @@ export function AboutSection({ currentTheme, onOpenResume }: AboutSectionProps) 
           <div className="lg:col-span-5 p-8 sm:p-10 bg-[#141414] border border-[#333333] flex flex-col justify-center shadow-xl">
             <span className="text-[10px] uppercase tracking-[0.4em] text-[#C5A059] block mb-3">Service Philosophy</span>
             <h4 className="text-xl sm:text-2xl font-serif italic text-white mb-5 leading-snug">
-              Grounding in Guest Care, Reaching into Digital Craft.
+              Grounding in Guest Care, Reaching into Digital Craft
             </h4>
             <div className="space-y-4 text-xs sm:text-sm text-[#999999] leading-relaxed font-light">
               <p>
@@ -118,7 +118,7 @@ export function AboutSection({ currentTheme, onOpenResume }: AboutSectionProps) 
               className="text-2xl sm:text-4xl font-serif italic font-light text-white tracking-tight"
               style={{ fontFamily: themeConfig.fontHeadline }}
             >
-              “Not your usual hospitality portfolio.”
+              “Not your usual hospitality portfolio”
             </h3>
             <p className="text-xs sm:text-sm text-[#888888] mt-2 font-light">
               Three connected pillars that shape everything Jeric creates
