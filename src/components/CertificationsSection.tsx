@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Calendar, Building, X, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Building, X, ExternalLink, Upload } from 'lucide-react';
 import { ThemeId, CertificationItem } from '../types';
 import { CERTIFICATIONS, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -22,24 +22,66 @@ function DragonIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
   );
 }
 
+const STORAGE_KEY = 'ja_portfolio_cert_images';
+
 export function CertificationsSection({ currentTheme }: CertificationsSectionProps) {
   const themeConfig = THEME_CONFIGS[currentTheme];
   const [popupCert, setPopupCert] = useState<CertificationItem | null>(null);
   const [isEnlarged, setIsEnlarged] = useState(false);
   const [timeLeft, setTimeLeft] = useState(5);
 
-  const rawBase = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/';
-  const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
-
-  const resolveImageUrl = (cert: CertificationItem) => {
-    if (cert.image) {
-      const clean = cert.image.startsWith('/') ? cert.image.slice(1) : cert.image;
-      return `${baseUrl}${clean}`;
+  // Client-side uploaded certificate images mapping: cert.id -> dataUrl
+  const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
     }
-    return '';
+  });
+
+  const handleImageUpload = (certId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setUploadedImages((prev) => {
+          const next = { ...prev, [certId]: dataUrl };
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          } catch (err) {
+            console.warn('Could not save certificate image to localStorage', err);
+          }
+          return next;
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
-  const handleDragonClick = (cert: CertificationItem) => {
+  const handleRemoveImage = (certId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setUploadedImages((prev) => {
+      const next = { ...prev };
+      delete next[certId];
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch (err) {
+        console.warn('Could not update localStorage', err);
+      }
+      return next;
+    });
+    if (popupCert?.id === certId) {
+      setPopupCert(null);
+      setIsEnlarged(false);
+    }
+  };
+
+  const handlePreviewClick = (cert: CertificationItem) => {
     setPopupCert(cert);
     setIsEnlarged(false);
     setTimeLeft(5);
@@ -64,6 +106,8 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
     }
   }, [popupCert, isEnlarged]);
 
+  const activeModalImage = popupCert ? uploadedImages[popupCert.id] : undefined;
+
   return (
     <section id="certifications" className="py-24 px-4 sm:px-6 lg:px-8 relative z-10 border-t border-[#222222]">
       <div className="max-w-6xl mx-auto">
@@ -85,63 +129,148 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
 
         {/* Credentials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {CERTIFICATIONS.map((cert) => (
-            <div
-              key={cert.id}
-              className="p-8 bg-[#1A1A1A] border border-[#333333] hover:border-[#C5A059]/60 transition-all duration-300 relative overflow-hidden flex flex-col justify-between group shadow-2xl"
-            >
-              <div className="absolute inset-0 bg-[#C5A059] opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none" />
-              {/* Top Row: Authority & Level with Dragon Icon */}
-              <div className="relative z-10">
-                <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-[#262626]">
+          {CERTIFICATIONS.map((cert) => {
+            const currentImg = uploadedImages[cert.id];
+
+            return (
+              <div
+                key={cert.id}
+                className="p-8 bg-[#1A1A1A] border border-[#333333] hover:border-[#C5A059]/60 transition-all duration-300 relative overflow-hidden flex flex-col justify-between group shadow-2xl"
+              >
+                <div className="absolute inset-0 bg-[#C5A059] opacity-0 group-hover:opacity-5 transition-opacity pointer-events-none" />
+                
+                {/* Top Details & Upload Area */}
+                <div className="relative z-10 flex-1 flex flex-col">
+                  {/* Top Row: Authority & Level with Dragon Icon */}
+                  <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-[#262626]">
+                    <button
+                      type="button"
+                      onClick={() => handlePreviewClick(cert)}
+                      className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider bg-[#141414] border border-[#333333] hover:border-[#C5A059] text-[#C5A059] flex items-center gap-1.5 transition-all cursor-pointer group/dragon"
+                      title="Click dragon icon to view certification"
+                      aria-label={`View ${cert.title} certificate`}
+                    >
+                      <DragonIcon className="w-3.5 h-3.5 text-[#C5A059] group-hover/dragon:scale-110 transition-transform" />
+                      <span>{cert.badgeLevel}</span>
+                    </button>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[#666666] flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-[#C5A059]" />
+                      <span>{cert.date}</span>
+                    </span>
+                  </div>
+
+                  <h3 
+                    className="text-xl font-serif italic text-white mb-2 leading-snug group-hover:text-[#C5A059] transition-colors"
+                    style={{ fontFamily: themeConfig.fontHeadline }}
+                  >
+                    {cert.title}
+                  </h3>
+
+                  <div className="flex items-center gap-1.5 text-xs text-[#C5A059] font-medium mb-3">
+                    <Building className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
+                    <span>Issuing Body: {cert.issuer}</span>
+                  </div>
+
+                  {/* Individual Image Upload Field & Display */}
+                  <div className="my-4">
+                    {!currentImg ? (
+                      <div>
+                        <input
+                          type="file"
+                          id={`upload-cert-${cert.id}`}
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(e) => handleImageUpload(cert.id, e)}
+                        />
+                        <label
+                          htmlFor={`upload-cert-${cert.id}`}
+                          className="w-full h-44 sm:h-48 border-2 border-dashed border-[#333333] hover:border-[#C5A059] bg-[#141414] hover:bg-[#1a1a1a] transition-all duration-200 cursor-pointer flex flex-col items-center justify-center p-4 text-center group/uploader select-none"
+                        >
+                          <div className="w-10 h-10 rounded-full bg-[#1c1c1c] border border-[#333333] group-hover/uploader:border-[#C5A059] flex items-center justify-center mb-2.5 text-[#888888] group-hover/uploader:text-[#C5A059] transition-colors">
+                            <Upload className="w-4 h-4 group-hover/uploader:scale-110 transition-transform" />
+                          </div>
+                          <span className="text-xs font-mono font-medium text-white group-hover/uploader:text-[#C5A059] transition-colors mb-1">
+                            Upload Certificate Image
+                          </span>
+                          <span className="text-[10px] text-[#777777] font-mono leading-tight">
+                            Select image from device • Original aspect ratio preserved
+                          </span>
+                          <div className="mt-3.5 px-3 py-1 bg-[#1e1e1e] border border-[#3a3a3a] group-hover/uploader:border-[#C5A059] text-[10px] font-mono text-[#C5A059] uppercase tracking-wider transition-colors">
+                            Upload Image
+                          </div>
+                        </label>
+                      </div>
+                    ) : (
+                      <div>
+                        {/* Certificate Image: Displayed exactly as uploaded with natural aspect ratio */}
+                        <div
+                          onClick={() => handlePreviewClick(cert)}
+                          className="w-full bg-white p-2.5 border border-[#333333] hover:border-[#C5A059] transition-all cursor-pointer group/certimg relative overflow-hidden flex items-center justify-center shadow-lg"
+                          title="Click to view full certificate"
+                        >
+                          <img
+                            src={currentImg}
+                            alt={`${cert.title} Certificate`}
+                            className="w-full h-auto max-h-56 sm:max-h-60 object-contain drop-shadow"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/certimg:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                            <span className="px-3 py-1 bg-[#141414]/95 border border-[#C5A059] text-[#C5A059] text-[10px] font-mono uppercase tracking-wider shadow-md">
+                              Click to Enlarge
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Replace Image / Remove Options */}
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#262626] text-[11px] font-mono">
+                          <input
+                            type="file"
+                            id={`replace-cert-${cert.id}`}
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={(e) => handleImageUpload(cert.id, e)}
+                          />
+                          <label
+                            htmlFor={`replace-cert-${cert.id}`}
+                            className="text-[#C5A059] hover:text-[#e0bb6b] hover:underline cursor-pointer flex items-center gap-1.5 py-1 px-1 transition-colors"
+                            title="Replace the current certificate image"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>Replace Image</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveImage(cert.id, e)}
+                            className="text-[#777777] hover:text-[#ff6b6b] hover:underline cursor-pointer py-1 px-1 transition-colors"
+                            title="Remove uploaded image"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-[#999999] leading-relaxed mb-6 font-light mt-auto">
+                    {cert.description}
+                  </p>
+                </div>
+
+                {/* Status footer with clickable dragon icon action */}
+                <div className="pt-4 border-t border-[#262626] flex items-center justify-between text-[10px] relative z-10 font-mono uppercase tracking-wider">
                   <button
                     type="button"
-                    onClick={() => handleDragonClick(cert)}
-                    className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider bg-[#141414] border border-[#333333] hover:border-[#C5A059] text-[#C5A059] flex items-center gap-1.5 transition-all cursor-pointer group/dragon"
-                    title="Click dragon icon to view national certification"
-                    aria-label={`View ${cert.title} certificate`}
+                    onClick={() => handlePreviewClick(cert)}
+                    className="flex items-center gap-1.5 text-[#C5A059] hover:underline cursor-pointer group/footer"
+                    title="Click to view certification details"
                   >
-                    <DragonIcon className="w-3.5 h-3.5 text-[#C5A059] group-hover/dragon:scale-110 transition-transform" />
-                    <span>{cert.badgeLevel}</span>
+                    <DragonIcon className="w-3.5 h-3.5 group-hover/footer:scale-110 transition-transform" />
+                    <span>Verified & Current</span>
                   </button>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#666666] flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-[#C5A059]" />
-                    <span>{cert.date}</span>
-                  </span>
+                  <span className="text-[#666666]">{cert.badgeLevel.includes('III') ? 'PHILIPPINES NC III' : 'PHILIPPINES NC II'}</span>
                 </div>
-
-                <h3 
-                  className="text-xl font-serif italic text-white mb-2 leading-snug group-hover:text-[#C5A059] transition-colors"
-                  style={{ fontFamily: themeConfig.fontHeadline }}
-                >
-                  {cert.title}
-                </h3>
-
-                <div className="flex items-center gap-1.5 text-xs text-[#C5A059] font-medium mb-4">
-                  <Building className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
-                  <span>Issuing Body: {cert.issuer}</span>
-                </div>
-
-                <p className="text-xs text-[#999999] leading-relaxed mb-6 font-light">
-                  {cert.description}
-                </p>
               </div>
-
-              {/* Status footer with clickable dragon icon action */}
-              <div className="pt-4 border-t border-[#262626] flex items-center justify-between text-[10px] relative z-10 font-mono uppercase tracking-wider">
-                <button
-                  type="button"
-                  onClick={() => handleDragonClick(cert)}
-                  className="flex items-center gap-1.5 text-[#C5A059] hover:underline cursor-pointer group/footer"
-                  title="Click dragon icon to view national certification"
-                >
-                  <DragonIcon className="w-3.5 h-3.5 group-hover/footer:scale-110 transition-transform" />
-                  <span>Verified & Current</span>
-                </button>
-                <span className="text-[#666666]">{cert.badgeLevel.includes('III') ? 'PHILIPPINES NC III' : 'PHILIPPINES NC II'}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -184,24 +313,59 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
               </div>
             </div>
 
-            {/* Certification Image: Click to Enlarge */}
-            <div 
-              onClick={() => setIsEnlarged(true)}
-              className="w-full bg-white p-2 border border-[#333333] cursor-zoom-in hover:brightness-105 transition-all group/pop relative flex items-center justify-center shadow-lg overflow-hidden"
-              title="Click certification image to view in larger/wider view"
-            >
-              <img
-                src={resolveImageUrl(popupCert)}
-                alt={`${popupCert.title} Certificate`}
-                referrerPolicy="no-referrer"
-                className="w-full h-auto max-h-[55vh] object-contain drop-shadow"
-              />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/pop:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                <span className="px-3.5 py-1.5 bg-[#141414]/95 border border-[#C5A059] text-[#C5A059] text-[11px] font-mono uppercase tracking-wider shadow-xl">
-                  Click for Larger View
-                </span>
+            {/* Certification Image: Click to Enlarge or Placeholder */}
+            {activeModalImage ? (
+              <div 
+                onClick={() => setIsEnlarged(true)}
+                className="w-full bg-white p-2 border border-[#333333] cursor-zoom-in hover:brightness-105 transition-all group/pop relative flex items-center justify-center shadow-lg overflow-hidden"
+                title="Click certification image to view in larger/wider view"
+              >
+                <img
+                  src={activeModalImage}
+                  alt={`${popupCert.title} Certificate`}
+                  className="w-full h-auto max-h-[55vh] object-contain drop-shadow"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/pop:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                  <span className="px-3.5 py-1.5 bg-[#141414]/95 border border-[#C5A059] text-[#C5A059] text-[11px] font-mono uppercase tracking-wider shadow-xl">
+                    Click for Larger View
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-full bg-[#181818] p-6 border border-[#2a2a2a] text-center my-2 shadow-inner">
+                <div className="inline-flex p-3 rounded-full bg-[#121212] border border-[#C5A059]/40 mb-3 text-[#C5A059]">
+                  <DragonIcon className="w-6 h-6" />
+                </div>
+                <div className="text-[11px] font-mono uppercase tracking-widest text-[#C5A059] mb-1">
+                  {popupCert.badgeLevel} • Verified Credential
+                </div>
+                <h4 className="text-lg font-serif italic text-white mb-2">
+                  {popupCert.title}
+                </h4>
+                <div className="text-xs text-[#999999] mb-3 font-mono">
+                  Issued by {popupCert.issuer} • {popupCert.date}
+                </div>
+                <p className="text-xs text-[#bbbbbb] leading-relaxed max-w-md mx-auto font-light mb-4">
+                  {popupCert.description}
+                </p>
+                <div className="mt-3">
+                  <input
+                    type="file"
+                    id={`modal-upload-${popupCert.id}`}
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => handleImageUpload(popupCert.id, e)}
+                  />
+                  <label
+                    htmlFor={`modal-upload-${popupCert.id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#1f1f1f] border border-[#C5A059] text-[#C5A059] hover:bg-[#C5A059] hover:text-black text-xs font-mono uppercase tracking-wider cursor-pointer transition-all"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Certificate Image</span>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* 5-second countdown progress bar */}
             <div className="w-full bg-[#222222] h-1 mt-3 overflow-hidden">
@@ -212,7 +376,7 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
             </div>
 
             <div className="mt-2 text-[10px] font-mono text-[#777777] text-center">
-              Click image to enlarge • Disappears in 5 seconds
+              {activeModalImage ? 'Click image to enlarge • Disappears in 5 seconds' : 'Auto-closes in 5 seconds'}
             </div>
           </div>
         </div>
@@ -259,29 +423,53 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
               </button>
             </div>
 
-            {/* Enlarged Full Certificate Image */}
-            <div className="overflow-auto flex-1 flex items-center justify-center bg-white p-2 sm:p-4 border border-[#222]">
-              <img
-                src={resolveImageUrl(popupCert)}
-                alt={`${popupCert.title} Certificate`}
-                referrerPolicy="no-referrer"
-                className="w-full max-h-[75vh] object-contain shadow-md"
-              />
-            </div>
+            {/* Enlarged Full Certificate Image or Detailed Credential Card */}
+            {activeModalImage ? (
+              <>
+                <div className="overflow-auto flex-1 flex items-center justify-center bg-white p-2 sm:p-4 border border-[#222]">
+                  <img
+                    src={activeModalImage}
+                    alt={`${popupCert.title} Certificate`}
+                    className="w-full max-h-[75vh] object-contain shadow-md"
+                  />
+                </div>
 
-            {/* Enlarged Footer */}
-            <div className="mt-3 pt-2.5 border-t border-[#262626] flex items-center justify-between text-xs text-[#888] font-mono">
-              <span className="text-[11px] text-[#aaa]">Click outside image to close</span>
-              <a
-                href={resolveImageUrl(popupCert)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#C5A059] hover:underline flex items-center gap-1.5 text-[11px]"
-              >
-                <span>Open in New Tab</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
+                {/* Enlarged Footer */}
+                <div className="mt-3 pt-2.5 border-t border-[#262626] flex items-center justify-between text-xs text-[#888] font-mono">
+                  <span className="text-[11px] text-[#aaa]">Click outside image to close</span>
+                  <a
+                    href={activeModalImage}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#C5A059] hover:underline flex items-center gap-1.5 text-[11px]"
+                  >
+                    <span>Open in New Tab</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </>
+            ) : (
+              <div className="p-8 sm:p-12 text-center bg-[#181818] border border-[#2a2a2a] my-4">
+                <div className="inline-flex p-4 rounded-full bg-[#121212] border border-[#C5A059]/40 mb-4 text-[#C5A059]">
+                  <DragonIcon className="w-8 h-8" />
+                </div>
+                <div className="text-xs font-mono uppercase tracking-widest text-[#C5A059] mb-2">
+                  {popupCert.badgeLevel} • Accredited Qualification
+                </div>
+                <h3 className="text-2xl font-serif italic text-white mb-3">
+                  {popupCert.title}
+                </h3>
+                <div className="text-sm text-[#999999] mb-6 font-mono">
+                  Issuing Institution: {popupCert.issuer} • Conferred: {popupCert.date}
+                </div>
+                <p className="text-sm text-[#cccccc] leading-relaxed max-w-xl mx-auto font-light mb-8">
+                  {popupCert.description}
+                </p>
+                <div className="pt-4 border-t border-[#2a2a2a] text-xs font-mono text-[#888888]">
+                  Verified & Current National Certificate • Technical Education and Skills Development System
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
