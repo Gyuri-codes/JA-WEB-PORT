@@ -30,3 +30,41 @@
   background-image: radial-gradient(rgba(255, 255, 255, 0.12) 0.75px, transparent 0.75px);
   background-size: 24px 24px;
 }
+
+/* Print optimization for Official Resume */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  body {
+    background: #0F0F0F !important;
+    color: #E0E0E0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide background canvas, fixed navigations, and floating UI when printing */
+  nav, header, footer, .artistic-dot-matrix, canvas, [role="dialog"] > div > div:first-child, [role="dialog"] > div > div:last-child {
+    display: none !important;
+  }
+
+  .print-clean-modal {
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .print-clean-sheet {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}
+
