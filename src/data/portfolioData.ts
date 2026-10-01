@@ -17,7 +17,7 @@ export const PERSONAL_INFO = {
   centralIdea: "Hospitality meets creativity, technology, and AI.",
   positioningHeadline: "I create experiences people remember.",
   positioningSupport: "Hospitality Management student with hands-on guest service experience and a growing passion for creative technology, AI-powered projects, and digital experiences.",
-  humblePositioning: "A hospitality professional in the making who is exploring how technology and AI can be used to create memorable digital experiences.",
+  humblePositioning: "I’m a hospitality student who enjoys learning, meeting people, and gaining experience while growing my skills.",
   currentProject: {
     name: "Mind Meld",
     label: "Currently building → Mind Meld",
