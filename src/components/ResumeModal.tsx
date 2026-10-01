@@ -14,10 +14,9 @@ import {
   ChevronDown,
   Loader2
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { PERSONAL_INFO, EXPERIENCES, CERTIFICATIONS, SKILLS_DATA } from '../data/portfolioData';
 import { loadPortraitFromStorage } from '../utils/portraitStorage';
+import { generateResumePdf } from '../utils/generateResumePdf';
 
 interface ResumeModalProps {
   isOpen: boolean;
@@ -94,73 +93,12 @@ export function ResumeModal({ isOpen, onClose }: ResumeModalProps) {
 
   const handleDownloadPDF = async () => {
     setDropdownOpen(false);
-    const element = printableAreaRef.current;
-    if (!element) return;
-
     setIsDownloading(true);
 
     try {
-      // Pre-load images inside printable element
-      const images: HTMLImageElement[] = Array.from(element.getElementsByTagName('img'));
-      await Promise.all(
-        images.map(
-          (img: HTMLImageElement) =>
-            new Promise((resolve) => {
-              if (img.complete) resolve(null);
-              else {
-                img.onload = () => resolve(null);
-                img.onerror = () => resolve(null);
-              }
-            })
-        )
-      );
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#0F0F0F',
-        logging: false,
-        windowWidth: 1024,
-        onclone: (clonedDoc) => {
-          const clonedElement = clonedDoc.querySelector('[data-resume-sheet="true"]') as HTMLElement;
-          if (clonedElement) {
-            clonedElement.style.overflow = 'visible';
-            clonedElement.style.maxHeight = 'none';
-            clonedElement.style.height = 'auto';
-            clonedElement.style.width = '960px';
-          }
-        },
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = position - pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save('Jeric_Abestano_Official_Resume.pdf');
+      await generateResumePdf(profilePhoto);
     } catch (err) {
-      console.error('PDF export error, falling back to window.print():', err);
+      console.error('PDF generation error, falling back to window.print():', err);
       window.print();
     } finally {
       setIsDownloading(false);

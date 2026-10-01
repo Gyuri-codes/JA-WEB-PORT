@@ -31,22 +31,22 @@
   background-size: 24px 24px;
 }
 
-/* Print optimization for Official Resume */
+/* Print optimization for Official Resume (A4 White Format) */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm 15mm;
+    margin: 8mm 10mm;
   }
 
   body {
-    background: #0F0F0F !important;
-    color: #E0E0E0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Hide background canvas, fixed navigations, and floating UI when printing */
-  nav, header, footer, .artistic-dot-matrix, canvas, [role="dialog"] > div > div:first-child, [role="dialog"] > div > div:last-child {
+  /* Hide background canvas, navigations, footers, buttons when printing */
+  nav, header, footer, .artistic-dot-matrix, canvas, [role="dialog"] > div > div:first-child, [role="dialog"] > div > div:last-child, #mobile-menu-toggle-btn {
     display: none !important;
   }
 
@@ -55,16 +55,72 @@
     padding: 0 !important;
     margin: 0 !important;
     max-height: none !important;
+    height: auto !important;
     overflow: visible !important;
     border: none !important;
     box-shadow: none !important;
-    background: transparent !important;
+    background: #ffffff !important;
+    color: #111827 !important;
   }
 
   .print-clean-sheet {
     max-height: none !important;
+    height: auto !important;
     overflow: visible !important;
     padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  /* Text & Card contrast adjustments for White A4 Print */
+  .print-clean-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-clean-sheet h1, 
+  .print-clean-sheet h2, 
+  .print-clean-sheet h4,
+  .print-clean-sheet .text-white {
+    color: #111827 !important;
+  }
+
+  .print-clean-sheet p,
+  .print-clean-sheet li,
+  .print-clean-sheet .text-\[\#AAAAAA\],
+  .print-clean-sheet .text-\[\#CCCCCC\],
+  .print-clean-sheet .text-\[\#999999\] {
+    color: #374151 !important;
+  }
+
+  .print-clean-sheet .text-\[\#888888\],
+  .print-clean-sheet .text-\[\#666666\] {
+    color: #6B7280 !important;
+  }
+
+  .print-clean-sheet .text-\[\#C5A059\] {
+    color: #946E24 !important;
+  }
+
+  .print-clean-sheet .border-\[\#262626\],
+  .print-clean-sheet .border-\[\#333333\],
+  .print-clean-sheet .border-\[\#2a2a2a\] {
+    border-color: #E5E7EB !important;
+  }
+
+  .print-clean-sheet .border-l-\[\#C5A059\] {
+    border-left-color: #946E24 !important;
+  }
+
+  .print-clean-sheet .bg-\[\#141414\],
+  .print-clean-sheet .bg-\[\#161616\],
+  .print-clean-sheet .bg-\[\#1A1A1A\] {
+    background-color: #F9FAFB !important;
+  }
+
+  .print-clean-sheet .bg-\[\#C5A059\] {
+    background-color: #946E24 !important;
+    color: #ffffff !important;
   }
 }
 
