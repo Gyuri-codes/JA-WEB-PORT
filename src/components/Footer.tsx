@@ -1,13 +1,15 @@
-import { ArrowUp, Gamepad2, Mail, ExternalLink, Heart } from 'lucide-react';
-import { ThemeId } from '../types';
+import { ArrowUp, Gamepad2, Mail, FileText } from 'lucide-react';
+import { ThemeId, NavSectionId } from '../types';
 import { PERSONAL_INFO, THEME_CONFIGS } from '../data/portfolioData';
+import { NAV_LINKS } from './Navigation';
 
 interface FooterProps {
   currentTheme: ThemeId;
   onOpenResume: () => void;
+  onNavigate?: (section: NavSectionId) => void;
 }
 
-export function Footer({ currentTheme, onOpenResume }: FooterProps) {
+export function Footer({ currentTheme, onOpenResume, onNavigate }: FooterProps) {
   const themeConfig = THEME_CONFIGS[currentTheme];
 
   const scrollToTop = () => {
@@ -17,7 +19,7 @@ export function Footer({ currentTheme, onOpenResume }: FooterProps) {
   return (
     <footer className="relative z-10 border-t border-[#222222] bg-[#0A0A0A] py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-12 border-b border-[#222222]">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-10 border-b border-[#222222]">
           {/* Brand & Tagline */}
           <div>
             <span 
@@ -56,14 +58,14 @@ export function Footer({ currentTheme, onOpenResume }: FooterProps) {
 
             <button
               onClick={onOpenResume}
-              className="hover:text-[#C5A059] transition-colors uppercase tracking-wider font-mono text-[11px]"
+              className="hover:text-[#C5A059] transition-colors uppercase tracking-wider font-mono text-[11px] cursor-pointer"
             >
               View Résumé
             </button>
 
             <button
               onClick={scrollToTop}
-              className="p-2.5 border border-[#333333] bg-[#141414] text-[#C5A059] hover:border-[#C5A059] transition-colors"
+              className="p-2.5 border border-[#333333] bg-[#141414] text-[#C5A059] hover:border-[#C5A059] transition-colors cursor-pointer"
               title="Back to Top"
               aria-label="Back to Top"
             >
@@ -71,6 +73,22 @@ export function Footer({ currentTheme, onOpenResume }: FooterProps) {
             </button>
           </div>
         </div>
+
+        {/* Section Quick Switcher Links in Footer */}
+        {onNavigate && (
+          <div className="py-6 border-b border-[#1C1C1C] flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-[10px] uppercase font-mono tracking-widest text-[#777777]">
+            {NAV_LINKS.map((link) => (
+              <button
+                key={link.id}
+                type="button"
+                onClick={() => onNavigate(link.id)}
+                className="hover:text-[#C5A059] transition-colors cursor-pointer"
+              >
+                {link.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Bottom Bar with Required Closing Statement */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#666666]">

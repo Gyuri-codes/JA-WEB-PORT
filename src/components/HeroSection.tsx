@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, Gamepad2, Compass, Layers, Coffee, Cpu, HeartHandshake, Ghost, Flame, Palmtree } from 'lucide-react';
-import { ThemeId } from '../types';
+import { ThemeId, NavSectionId } from '../types';
 import { PERSONAL_INFO, THEME_CONFIGS } from '../data/portfolioData';
 
 interface HeroSectionProps {
   currentTheme: ThemeId;
   onOpenResume: () => void;
+  onNavigate?: (section: NavSectionId) => void;
 }
 
-export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
+export function HeroSection({ currentTheme, onOpenResume, onNavigate }: HeroSectionProps) {
   const themeConfig = THEME_CONFIGS[currentTheme];
 
   // Dynamic Experience Map pairs
@@ -29,16 +30,20 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
     return () => clearInterval(timer);
   }, [mapPairs.length]);
 
-  const scrollToProjects = () => {
-    document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' });
+  const goToProjects = () => {
+    if (onNavigate) {
+      onNavigate('projects');
+    } else {
+      document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
-  const scrollToContact = () => {
-    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const scrollToMindMeld = () => {
-    document.getElementById('mind-meld')?.scrollIntoView({ behavior: 'smooth' });
+  const goToContact = () => {
+    if (onNavigate) {
+      onNavigate('contact');
+    } else {
+      document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
@@ -68,7 +73,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
         {/* Primary Action Buttons - Architectural outlined gold & sleek dark */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
           <button
-            onClick={scrollToProjects}
+            onClick={goToProjects}
             id="hero-view-work-btn"
             className="w-full sm:w-auto px-8 py-4 text-[11px] uppercase tracking-[0.3em] font-semibold border border-[#C5A059] text-[#C5A059] hover:bg-[#C5A059] hover:text-[#0F0F0F] transition-all duration-300 flex items-center justify-center gap-3 cursor-pointer shadow-lg group"
           >
@@ -77,7 +82,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           </button>
 
           <button
-            onClick={scrollToContact}
+            onClick={goToContact}
             id="hero-connect-btn"
             className="w-full sm:w-auto px-8 py-4 text-[11px] uppercase tracking-[0.3em] font-medium border border-[#333333] text-[#E0E0E0] bg-[#141414] hover:border-[#C5A059]/60 hover:text-[#C5A059] transition-all duration-300 cursor-pointer"
           >
@@ -102,7 +107,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           </a>
 
           <button
-            onClick={() => document.getElementById('emberfall')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={goToProjects}
             id="hero-emberfall-link"
             className="inline-flex items-center gap-2 text-xs text-[#f59e0b] hover:text-white transition-colors group px-4 py-2 border border-[#b45309]/50 bg-[#291405]/80 hover:bg-[#3d1e08] shadow-sm cursor-pointer"
           >
@@ -128,7 +133,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           </a>
 
           <button
-            onClick={() => document.getElementById('the-house')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={goToProjects}
             id="hero-the-house-link"
             className="inline-flex items-center gap-2 text-xs text-[#ff9999] hover:text-white transition-colors group px-4 py-2 border border-[#442222] bg-[#1a0f0f] hover:bg-[#2a1414] shadow-sm cursor-pointer"
           >
@@ -140,7 +145,7 @@ export function HeroSection({ currentTheme, onOpenResume }: HeroSectionProps) {
           </button>
 
           <button
-            onClick={scrollToMindMeld}
+            onClick={goToProjects}
             id="hero-mind-meld-link"
             className="inline-flex items-center gap-2.5 text-xs text-[#888888] hover:text-[#C5A059] transition-colors group px-4 py-2 border border-[#2a2a2a] bg-[#141414] hover:bg-[#1a1a1a] cursor-pointer"
           >

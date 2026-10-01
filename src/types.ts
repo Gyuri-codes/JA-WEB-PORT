@@ -7,6 +7,17 @@ export type ThemeId =
   | 'clash'        // 🏰 Clash Kingdom (Clash of Clans strategy / playful)
   | 'mythic';      // 🐉 Mythic Dynasty (Honor of Kings / Chinese mythology)
 
+export type NavSectionId = 
+  | 'home'
+  | 'about'
+  | 'skills'
+  | 'projects'
+  | 'experience'
+  | 'education'
+  | 'certifications'
+  | 'achievements'
+  | 'contact';
+
 export interface ExperienceItem {
   id: string;
   company: string;

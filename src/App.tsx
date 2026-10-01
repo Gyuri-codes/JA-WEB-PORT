@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { ThemeId, SettingsState } from './types';
+import { useState } from 'react';
+import { ThemeId, NavSectionId, SettingsState } from './types';
 import { THEME_CONFIGS } from './data/portfolioData';
 import { BackgroundCanvas } from './components/BackgroundCanvas';
 import { Navigation } from './components/Navigation';
@@ -7,12 +7,14 @@ import { HeroSection } from './components/HeroSection';
 import { AboutSection } from './components/AboutSection';
 import { ExperienceSection } from './components/ExperienceSection';
 import { SkillsSection } from './components/SkillsSection';
-import { CertificationsSection } from './components/CertificationsSection';
 import { ProjectsSection } from './components/ProjectsSection';
 import { EmberfallSection } from './components/EmberfallSection';
 import { HorrorGameSection } from './components/HorrorGameSection';
 import { MindMeldSection } from './components/MindMeldSection';
 import { HowIThinkSection } from './components/HowIThinkSection';
+import { EducationSection } from './components/EducationSection';
+import { CertificationsSection } from './components/CertificationsSection';
+import { AchievementsSection } from './components/AchievementsSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { ResumeModal } from './components/ResumeModal';
@@ -20,6 +22,10 @@ import { SettingsModal } from './components/SettingsModal';
 
 export default function App() {
   const [currentTheme, setCurrentTheme] = useState<ThemeId>('artistic');
+  const [activeSection, setActiveSection] = useState<NavSectionId>('home');
+  const [displayedSection, setDisplayedSection] = useState<NavSectionId>('home');
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
   const [isWarping, setIsWarping] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -33,6 +39,21 @@ export default function App() {
   });
 
   const activeThemeConfig = THEME_CONFIGS[currentTheme];
+
+  // Dynamic Content Switching System (no page scroll down)
+  const handleSelectSection = (newSection: NavSectionId) => {
+    if (newSection === displayedSection && !isTransitioning) return;
+    setActiveSection(newSection);
+    setIsTransitioning(true);
+    
+    // Reset view position smoothly to top
+    window.scrollTo({ top: 0, behavior: 'instant' });
+
+    setTimeout(() => {
+      setDisplayedSection(newSection);
+      setIsTransitioning(false);
+    }, 180);
+  };
 
   // Handle universe warp animation
   const handleSelectTheme = (newTheme: ThemeId) => {
@@ -81,6 +102,79 @@ export default function App() {
       ? 'text-sm'
       : 'text-base';
 
+  // Render the selected dynamic content area
+  const renderActiveContent = () => {
+    switch (displayedSection) {
+      case 'home':
+        return (
+          <HeroSection
+            currentTheme={currentTheme}
+            onOpenResume={() => setResumeOpen(true)}
+            onNavigate={handleSelectSection}
+          />
+        );
+
+      case 'about':
+        return (
+          <div className="space-y-0">
+            <AboutSection
+              currentTheme={currentTheme}
+              onOpenResume={() => setResumeOpen(true)}
+            />
+            <HowIThinkSection currentTheme={currentTheme} />
+          </div>
+        );
+
+      case 'skills':
+        return <SkillsSection currentTheme={currentTheme} />;
+
+      case 'projects':
+        return (
+          <div className="space-y-0">
+            <ProjectsSection currentTheme={currentTheme} />
+            <EmberfallSection currentTheme={currentTheme} />
+            <HorrorGameSection currentTheme={currentTheme} />
+            <MindMeldSection currentTheme={currentTheme} />
+          </div>
+        );
+
+      case 'experience':
+        return <ExperienceSection currentTheme={currentTheme} />;
+
+      case 'education':
+        return <EducationSection currentTheme={currentTheme} />;
+
+      case 'certifications':
+        return <CertificationsSection currentTheme={currentTheme} />;
+
+      case 'achievements':
+        return (
+          <AchievementsSection
+            currentTheme={currentTheme}
+            onNavigateToProjects={() => handleSelectSection('projects')}
+            onNavigateToCertifications={() => handleSelectSection('certifications')}
+          />
+        );
+
+      case 'contact':
+        return (
+          <ContactSection
+            currentTheme={currentTheme}
+            onOpenResume={() => setResumeOpen(true)}
+          />
+        );
+
+      default:
+        return (
+          <HeroSection
+            currentTheme={currentTheme}
+            onOpenResume={() => setResumeOpen(true)}
+            onNavigate={handleSelectSection}
+          />
+        );
+    }
+  };
+
   return (
     <div
       className={`min-h-screen relative text-[#E0E0E0] transition-colors duration-700 selection:bg-[#C5A059]/30 selection:text-white ${getThemeBackground()} ${fontSizeClass}`}
@@ -118,42 +212,35 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Persistent Navigation */}
+      {/* Persistent Navigation with Dynamic Content Switching */}
       <Navigation
         currentTheme={currentTheme}
+        activeSection={activeSection}
+        onSelectSection={handleSelectSection}
         onSelectTheme={handleSelectTheme}
         onOpenResume={() => setResumeOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {/* Core Portfolio Sections */}
-      <main className="relative z-10">
-        <HeroSection
-          currentTheme={currentTheme}
-          onOpenResume={() => setResumeOpen(true)}
-        />
-        <AboutSection
-          currentTheme={currentTheme}
-          onOpenResume={() => setResumeOpen(true)}
-        />
-        <ExperienceSection currentTheme={currentTheme} />
-        <SkillsSection currentTheme={currentTheme} />
-        <CertificationsSection currentTheme={currentTheme} />
-        <ProjectsSection currentTheme={currentTheme} />
-        <EmberfallSection currentTheme={currentTheme} />
-        <HorrorGameSection currentTheme={currentTheme} />
-        <MindMeldSection currentTheme={currentTheme} />
-        <HowIThinkSection currentTheme={currentTheme} />
-        <ContactSection
-          currentTheme={currentTheme}
-          onOpenResume={() => setResumeOpen(true)}
-        />
+      {/* Main Portfolio Display Area - Controlled by Navigation (Dynamic Replacement) */}
+      <main className="relative z-10 pt-24 sm:pt-28 pb-8 min-h-[85vh]">
+        <div
+          key={displayedSection}
+          className={`transition-all duration-300 ease-out transform ${
+            isTransitioning
+              ? 'opacity-0 translate-y-3 scale-[0.99]'
+              : 'opacity-100 translate-y-0 scale-100'
+          }`}
+        >
+          {renderActiveContent()}
+        </div>
       </main>
 
       {/* Required Brand Footer */}
       <Footer
         currentTheme={currentTheme}
         onOpenResume={() => setResumeOpen(true)}
+        onNavigate={handleSelectSection}
       />
 
       {/* Interactive Official Résumé Viewer & PDF Modal */}
