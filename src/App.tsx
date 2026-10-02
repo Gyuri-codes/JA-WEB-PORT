@@ -15,6 +15,7 @@ import { HowIThinkSection } from './components/HowIThinkSection';
 import { EducationSection } from './components/EducationSection';
 import { CertificationsSection } from './components/CertificationsSection';
 import { AchievementsSection } from './components/AchievementsSection';
+import { GallerySection } from './components/GallerySection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { ResumeModal } from './components/ResumeModal';
@@ -155,6 +156,9 @@ export default function App() {
             onNavigateToCertifications={() => handleSelectSection('certifications')}
           />
         );
+
+      case 'gallery':
+        return <GallerySection currentTheme={currentTheme} />;
 
       case 'contact':
         return (

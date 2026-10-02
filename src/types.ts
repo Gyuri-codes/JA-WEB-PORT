@@ -16,7 +16,20 @@ export type NavSectionId =
   | 'education'
   | 'certifications'
   | 'achievements'
+  | 'gallery'
   | 'contact';
+
+export interface GalleryImage {
+  id: string;
+  dataUrl: string;
+  title: string;
+  caption?: string;
+  category?: string;
+  uploadedAt: number;
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
+}
 
 export interface ExperienceItem {
   id: string;

@@ -22,6 +22,7 @@ export const NAV_LINKS: { id: NavSectionId; label: string }[] = [
   { id: 'education', label: 'Education' },
   { id: 'certifications', label: 'Certifications' },
   { id: 'achievements', label: 'Achievements' },
+  { id: 'gallery', label: 'Gallery' },
   { id: 'contact', label: 'Contact' },
 ];
 
