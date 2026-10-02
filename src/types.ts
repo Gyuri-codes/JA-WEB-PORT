@@ -25,10 +25,20 @@ export interface GalleryImage {
   title: string;
   caption?: string;
   category?: string;
+  albumIds?: string[];
   uploadedAt: number;
   sizeBytes?: number;
   width?: number;
   height?: number;
+}
+
+export interface GalleryAlbum {
+  id: string;
+  name: string;
+  description?: string;
+  coverImageId?: string;
+  imageIds: string[];
+  createdAt: number;
 }
 
 export interface ExperienceItem {

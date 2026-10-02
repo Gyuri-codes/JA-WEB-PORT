@@ -1,8 +1,9 @@
-import { GalleryImage } from '../types';
+import { GalleryImage, GalleryAlbum } from '../types';
 
 const DB_NAME = 'JA_GALLERY_DB_V2';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'gallery_items_v2';
+const ALBUM_STORE_NAME = 'gallery_albums_v2';
 
 // Ensure any legacy trial databases from earlier test versions are cleaned up
 if (typeof window !== 'undefined') {
@@ -30,6 +31,9 @@ function openGalleryDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
+      if (!db.objectStoreNames.contains(ALBUM_STORE_NAME)) {
+        db.createObjectStore(ALBUM_STORE_NAME, { keyPath: 'id' });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -52,7 +56,6 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
 
       request.onsuccess = () => {
         const rawItems: GalleryImage[] = request.result || [];
-        // Only return images uploaded specifically to this gallery
         const manualItems = rawItems.filter((item) => !item.id.startsWith('starter-'));
         manualItems.sort((a, b) => b.uploadedAt - a.uploadedAt);
         resolve(manualItems);
@@ -162,17 +165,34 @@ export async function updateGalleryImage(id: string, updates: Partial<GalleryIma
 }
 
 /**
- * Deletes a single image by ID.
+ * Deletes a single image by ID and removes it from any albums it was part of.
  */
 export async function deleteGalleryImage(id: string): Promise<boolean> {
   try {
     const db = await openGalleryDB();
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      const tx = db.transaction([STORE_NAME, ALBUM_STORE_NAME], 'readwrite');
+      const imgStore = tx.objectStore(STORE_NAME);
+      const albumStore = tx.objectStore(ALBUM_STORE_NAME);
+
+      imgStore.delete(id);
+
+      const albumsReq = albumStore.getAll();
+      albumsReq.onsuccess = () => {
+        const albums: GalleryAlbum[] = albumsReq.result || [];
+        albums.forEach((album) => {
+          if (album.imageIds.includes(id)) {
+            album.imageIds = album.imageIds.filter((imgId) => imgId !== id);
+            if (album.coverImageId === id) {
+              album.coverImageId = album.imageIds[0] || undefined;
+            }
+            albumStore.put(album);
+          }
+        });
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
     return true;
   } catch (err) {
@@ -182,15 +202,33 @@ export async function deleteGalleryImage(id: string): Promise<boolean> {
 }
 
 /**
- * Deletes multiple images by ID array.
+ * Deletes multiple images by ID array and removes them from albums.
  */
 export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolean> {
   try {
     const db = await openGalleryDB();
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      ids.forEach((id) => store.delete(id));
+      const tx = db.transaction([STORE_NAME, ALBUM_STORE_NAME], 'readwrite');
+      const imgStore = tx.objectStore(STORE_NAME);
+      const albumStore = tx.objectStore(ALBUM_STORE_NAME);
+
+      ids.forEach((id) => imgStore.delete(id));
+
+      const albumsReq = albumStore.getAll();
+      albumsReq.onsuccess = () => {
+        const albums: GalleryAlbum[] = albumsReq.result || [];
+        albums.forEach((album) => {
+          const filtered = album.imageIds.filter((imgId) => !ids.includes(imgId));
+          if (filtered.length !== album.imageIds.length) {
+            album.imageIds = filtered;
+            if (album.coverImageId && ids.includes(album.coverImageId)) {
+              album.coverImageId = album.imageIds[0] || undefined;
+            }
+            albumStore.put(album);
+          }
+        });
+      };
+
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -202,21 +240,239 @@ export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolea
 }
 
 /**
- * Clears all gallery images.
+ * Clears all gallery images and resets album image lists (albums themselves remain or are cleared).
  */
 export async function clearAllGalleryImages(): Promise<boolean> {
   try {
     const db = await openGalleryDB();
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.clear();
+      const tx = db.transaction([STORE_NAME, ALBUM_STORE_NAME], 'readwrite');
+      const imgStore = tx.objectStore(STORE_NAME);
+      const albumStore = tx.objectStore(ALBUM_STORE_NAME);
+
+      imgStore.clear();
+
+      const albumsReq = albumStore.getAll();
+      albumsReq.onsuccess = () => {
+        const albums: GalleryAlbum[] = albumsReq.result || [];
+        albums.forEach((album) => {
+          album.imageIds = [];
+          album.coverImageId = undefined;
+          albumStore.put(album);
+        });
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to clear gallery images:', err);
+    return false;
+  }
+}
+
+/* =========================================================================
+ * ALBUM MANAGEMENT FUNCTIONS
+ * ========================================================================= */
+
+/**
+ * Loads all albums from IndexedDB.
+ */
+export async function loadGalleryAlbums(): Promise<GalleryAlbum[]> {
+  try {
+    const db = await openGalleryDB();
+    return new Promise<GalleryAlbum[]>((resolve, reject) => {
+      const tx = db.transaction(ALBUM_STORE_NAME, 'readonly');
+      const store = tx.objectStore(ALBUM_STORE_NAME);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        const albums: GalleryAlbum[] = request.result || [];
+        albums.sort((a, b) => b.createdAt - a.createdAt);
+        resolve(albums);
+      };
+
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.warn('Could not load gallery albums from IndexedDB, falling back to localStorage:', err);
+    try {
+      const fallback = localStorage.getItem('ja_gallery_albums_v2');
+      if (fallback) {
+        const parsed = JSON.parse(fallback);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  }
+}
+
+/**
+ * Creates or updates an album in IndexedDB.
+ */
+export async function saveGalleryAlbum(album: GalleryAlbum): Promise<boolean> {
+  try {
+    const db = await openGalleryDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(ALBUM_STORE_NAME);
+      const req = store.put(album);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
     return true;
   } catch (err) {
-    console.error('Failed to clear gallery images:', err);
+    console.error('Failed to save album:', err);
+    return false;
+  }
+}
+
+/**
+ * Updates an album's name, description, cover image, or imageIds.
+ */
+export async function updateGalleryAlbum(id: string, updates: Partial<GalleryAlbum>): Promise<boolean> {
+  try {
+    const db = await openGalleryDB();
+    return new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(ALBUM_STORE_NAME);
+      const getReq = store.get(id);
+
+      getReq.onsuccess = () => {
+        const album: GalleryAlbum | undefined = getReq.result;
+        if (!album) {
+          resolve(false);
+          return;
+        }
+
+        const updated = { ...album, ...updates };
+        const putReq = store.put(updated);
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => reject(putReq.error);
+      };
+
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (err) {
+    console.error('Failed to update album:', err);
+    return false;
+  }
+}
+
+/**
+ * Deletes an album.
+ * IMPORTANT: This does NOT delete the images inside it; they remain in the main Gallery.
+ */
+export async function deleteGalleryAlbum(id: string): Promise<boolean> {
+  try {
+    const db = await openGalleryDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(ALBUM_STORE_NAME);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to delete album:', err);
+    return false;
+  }
+}
+
+/**
+ * Adds one or more images to an album.
+ */
+export async function addImagesToAlbum(albumId: string, imageIds: string[]): Promise<boolean> {
+  try {
+    const db = await openGalleryDB();
+    return new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(ALBUM_STORE_NAME);
+      const getReq = store.get(albumId);
+
+      getReq.onsuccess = () => {
+        const album: GalleryAlbum | undefined = getReq.result;
+        if (!album) {
+          resolve(false);
+          return;
+        }
+
+        const currentSet = new Set(album.imageIds);
+        imageIds.forEach((id) => currentSet.add(id));
+        album.imageIds = Array.from(currentSet);
+
+        // If no cover image was set, use the first image
+        if (!album.coverImageId && album.imageIds.length > 0) {
+          album.coverImageId = album.imageIds[0];
+        }
+
+        const putReq = store.put(album);
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => reject(putReq.error);
+      };
+
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (err) {
+    console.error('Failed to add images to album:', err);
+    return false;
+  }
+}
+
+/**
+ * Removes one or more images from an album without deleting them from the Gallery.
+ */
+export async function removeImagesFromAlbum(albumId: string, imageIds: string[]): Promise<boolean> {
+  try {
+    const db = await openGalleryDB();
+    return new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(ALBUM_STORE_NAME);
+      const getReq = store.get(albumId);
+
+      getReq.onsuccess = () => {
+        const album: GalleryAlbum | undefined = getReq.result;
+        if (!album) {
+          resolve(false);
+          return;
+        }
+
+        album.imageIds = album.imageIds.filter((id) => !imageIds.includes(id));
+        if (album.coverImageId && imageIds.includes(album.coverImageId)) {
+          album.coverImageId = album.imageIds[0] || undefined;
+        }
+
+        const putReq = store.put(album);
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => reject(putReq.error);
+      };
+
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (err) {
+    console.error('Failed to remove images from album:', err);
+    return false;
+  }
+}
+
+/**
+ * Moves images from one album to another album.
+ */
+export async function moveImagesBetweenAlbums(
+  fromAlbumId: string,
+  toAlbumId: string,
+  imageIds: string[]
+): Promise<boolean> {
+  try {
+    await removeImagesFromAlbum(fromAlbumId, imageIds);
+    await addImagesToAlbum(toAlbumId, imageIds);
+    return true;
+  } catch (err) {
+    console.error('Failed to move images between albums:', err);
     return false;
   }
 }
