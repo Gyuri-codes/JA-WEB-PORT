@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost, Compass, Eye, X, Maximize2, Moon, Flame, Palmtree } from 'lucide-react';
+import { ExternalLink, Gamepad2, Utensils, Hotel, ArrowUpRight, Sparkles, Ghost, Compass, Eye, X, Maximize2, Moon, Flame } from 'lucide-react';
 import { ThemeId } from '../types';
 import { PERSONAL_INFO, THEME_CONFIGS, HORROR_GAME_CASE_STUDY, RURU_PROJECT_DATA, EMBERFALL_PROJECT_DATA, ALON_ANINAG_PROJECT_DATA } from '../data/portfolioData';
 
@@ -14,19 +14,20 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
 
   const projects = [
     {
-      id: "alon-aninag",
-      title: "Alon Aninag Boutique Beach Resort",
-      category: "Boutique Beach Resort Web Concept",
+      id: ALON_ANINAG_PROJECT_DATA.id,
+      title: ALON_ANINAG_PROJECT_DATA.title,
+      category: ALON_ANINAG_PROJECT_DATA.category,
       filterCategory: ['hospitality', 'interactive'],
-      tagline: "Boutique beachfront sanctuary in Poblacion Beach, Sipalay City, Negros Occidental. \"Where Waves Rest and Souls Glow.\"",
-      tools: ["Hospitality Branding", "Boutique Resort UI", "Tailwind CSS", "React / Web", "GitHub Pages"],
+      tagline: ALON_ANINAG_PROJECT_DATA.tagline,
+      tools: ALON_ANINAG_PROJECT_DATA.tools,
       isFeatured: true,
-      badgeText: "Boutique Resort",
+      badgeText: "Featured Resort",
       badgeColor: "text-[#2dd4bf] bg-[#2dd4bf]/10 border-[#2dd4bf]/40",
       accentBorder: "border-[#2dd4bf]/80",
       link: ALON_ANINAG_PROJECT_DATA.officialUrl,
-      actionText: "Explore Resort Site",
-      canPreview: true
+      actionText: "View Project",
+      canPreview: true,
+      thumbnail: ALON_ANINAG_PROJECT_DATA.thumbnail
     },
     {
       id: "emberfall-guardians",
@@ -150,7 +151,7 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
             Featured Works & Initiatives
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] max-w-xl mx-auto font-light leading-relaxed">
-            Tangible outcomes bridging hospitality service precision with real-time 3D web experiences, boutique resort concepts, and interactive games.
+            Tangible outcomes bridging hospitality service precision with real-time 3D web experiences, digital tools, and interactive games.
           </p>
 
           {/* Filter Navigation */}
@@ -186,7 +187,7 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                   : 'bg-[#141414] text-[#888888] border-[#2A2A2A] hover:border-[#444] hover:text-white'
               }`}
             >
-              Hospitality & Resorts ({hospitalityCount})
+              Hospitality ({hospitalityCount})
             </button>
           </div>
         </div>
@@ -210,6 +211,31 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                     {proj.badgeText}
                   </span>
                 </div>
+
+                {proj.thumbnail && (
+                  <div
+                    onClick={() => proj.canPreview && setPreviewProject({ title: proj.title, url: proj.link })}
+                    className={`mb-4 overflow-hidden border border-[#2a2a2a] bg-[#0c0d10] aspect-video relative group/thumb ${
+                      proj.canPreview ? 'cursor-pointer' : ''
+                    }`}
+                  >
+                    <img
+                      src={proj.thumbnail}
+                      alt={proj.title}
+                      className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity" />
+                    {proj.canPreview && (
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-white px-2.5 py-1 bg-black/80 border border-white/20 flex items-center gap-1.5 shadow-lg">
+                          <Eye className="w-3 h-3 text-[#2dd4bf]" />
+                          Quick Preview
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <h3 
                   className="text-lg font-serif italic text-white mb-2 leading-snug group-hover:text-[#C5A059] transition-colors"

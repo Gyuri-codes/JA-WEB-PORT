@@ -276,18 +276,17 @@ export const EMBERFALL_PROJECT_DATA = {
 export const ALON_ANINAG_PROJECT_DATA = {
   id: "alon-aninag",
   title: "Alon Aninag Boutique Beach Resort",
-  tagline: "Where Waves Rest and Souls Glow.",
-  location: "Poblacion Beach, Sipalay City, Negros Occidental",
-  overview: "A boutique beachfront sanctuary web concept crafted for Poblacion Beach in Sipalay City, Negros Occidental. Seamlessly harmonizes coastal serenity, Filipino hospitality warmth, curated guest journeys, immersive modern typography, and responsive web interactions.",
-  officialUrl: "https://gyuri-codes.github.io/Alon-Aninag/",
-  category: "Boutique Beach Resort Web Concept",
-  genre: "Hospitality & Coastal Luxury Resort Web Experience",
-  tools: ["Hospitality Branding", "Boutique Resort UI", "Tailwind CSS", "React / Web", "GitHub Pages"],
+  tagline: "Where Waves Rest and Souls Glow — A boutique beachfront retreat web application in Poblacion Beach, Sipalay City featuring cozy oceanfront rooms, sunset deck dining, and authentic Negrense hospitality.",
+  overview: "A boutique beachfront retreat web application in Poblacion Beach, Sipalay City featuring interactive room booking, sunset dining reservations, curated coastal experiences, and authentic Negrense hospitality.",
+  officialUrl: "https://gyuri-codes.github.io/Group-1/",
+  thumbnail: "https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?auto=format&fit=crop&w=1200&q=80",
+  category: "Boutique Resort Web Experience",
+  tools: ["React", "TypeScript", "Tailwind CSS", "Hospitality UX", "GitHub Pages"],
   highlights: [
-    "Evocative coastal aesthetic inspired by Sipalay City's pristine turquoise waters & golden sunsets",
-    "Digital guest journey including boutique room showcases, beachfront amenities, and reservation flows",
-    "Harmonious union of BS Hospitality Management background with modern web development",
-    "Live, responsive web experience published to GitHub Pages"
+    "Direct golden sand beachfront retreat on Poblacion Bay, Sipalay City",
+    "Interactive room and oceanfront villa booking with real-time availability",
+    "Sunset viewing deck dining & acoustic soul bonfire reservations",
+    "Curated Negrense culinary philosophy and coastal tour guides"
   ]
 };
 
