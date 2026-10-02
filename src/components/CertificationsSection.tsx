@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Building, X, ExternalLink, Upload } from 'lucide-react';
 import { ThemeId, CertificationItem } from '../types';
 import { CERTIFICATIONS, THEME_CONFIGS } from '../data/portfolioData';
@@ -29,6 +29,11 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
   const [popupCert, setPopupCert] = useState<CertificationItem | null>(null);
   const [isEnlarged, setIsEnlarged] = useState(false);
   const [timeLeft, setTimeLeft] = useState(5);
+
+  // Replace certification image modal state
+  const [replaceModalCert, setReplaceModalCert] = useState<CertificationItem | null>(null);
+  const [isDragOverReplace, setIsDragOverReplace] = useState(false);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
 
   // Client-side uploaded certificate images mapping: cert.id -> dataUrl
   const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(() => {
@@ -105,6 +110,19 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
       return () => clearInterval(interval);
     }
   }, [popupCert, isEnlarged]);
+
+  // Close replace modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && replaceModalCert) {
+        setReplaceModalCert(null);
+      }
+    };
+    if (replaceModalCert) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [replaceModalCert]);
 
   const activeModalImage = popupCert ? uploadedImages[popupCert.id] : undefined;
 
@@ -202,41 +220,37 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                       </div>
                     ) : (
                       <div>
-                        {/* Certificate Image: Displayed exactly as uploaded with natural aspect ratio */}
+                        {/* Certificate Image: Clickable to open the Replace Image Pop-up */}
                         <div
-                          onClick={() => handlePreviewClick(cert)}
+                          onClick={() => setReplaceModalCert(cert)}
                           className="w-full bg-white p-2.5 border border-[#333333] hover:border-[#C5A059] transition-all cursor-pointer group/certimg relative overflow-hidden flex items-center justify-center shadow-lg"
-                          title="Click to view full certificate"
+                          title="Click to replace certification image"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setReplaceModalCert(cert);
+                            }
+                          }}
                         >
                           <img
                             src={currentImg}
                             alt={`${cert.title} Certificate`}
-                            className="w-full h-auto max-h-56 sm:max-h-60 object-contain drop-shadow"
+                            className="w-full h-auto max-h-56 sm:max-h-60 object-contain drop-shadow group-hover/certimg:scale-[1.02] transition-transform duration-300"
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/certimg:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/certimg:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 pointer-events-none p-3 text-center">
+                            <div className="w-8 h-8 rounded-full bg-[#141414] border border-[#C5A059] text-[#C5A059] flex items-center justify-center shadow-md">
+                              <Upload className="w-4 h-4" />
+                            </div>
                             <span className="px-3 py-1 bg-[#141414]/95 border border-[#C5A059] text-[#C5A059] text-[10px] font-mono uppercase tracking-wider shadow-md">
-                              Click to Enlarge
+                              Click to Replace Image
                             </span>
                           </div>
                         </div>
 
-                        {/* Replace Image / Remove Options */}
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#262626] text-[11px] font-mono">
-                          <input
-                            type="file"
-                            id={`replace-cert-${cert.id}`}
-                            accept="image/*"
-                            className="sr-only"
-                            onChange={(e) => handleImageUpload(cert.id, e)}
-                          />
-                          <label
-                            htmlFor={`replace-cert-${cert.id}`}
-                            className="text-[#C5A059] hover:text-[#e0bb6b] hover:underline cursor-pointer flex items-center gap-1.5 py-1 px-1 transition-colors"
-                            title="Replace the current certificate image"
-                          >
-                            <Upload className="w-3 h-3" />
-                            <span>Replace Image</span>
-                          </label>
+                        {/* Remove Option only - Always-visible Replace Image button is removed */}
+                        <div className="flex items-center justify-end mt-2 pt-2 border-t border-[#262626] text-[11px] font-mono">
                           <button
                             type="button"
                             onClick={(e) => handleRemoveImage(cert.id, e)}
@@ -470,6 +484,149 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Replace Certification Image Pop-up Modal */}
+      {replaceModalCert && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setReplaceModalCert(null)}
+        >
+          <div
+            className="relative w-full max-w-lg bg-[#141414] border border-[#C5A059]/80 shadow-2xl p-5 sm:p-6 flex flex-col animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Pop-up Header */}
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#262626]">
+              <div className="flex items-center gap-2.5">
+                <DragonIcon className="w-4 h-4 text-[#C5A059]" />
+                <div>
+                  <h3 className="text-base font-serif italic text-white leading-tight">
+                    Replace Certification Image
+                  </h3>
+                  <span className="text-[10px] font-mono text-[#C5A059] uppercase tracking-wider block">
+                    {replaceModalCert.title} • {replaceModalCert.badgeLevel}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplaceModalCert(null)}
+                className="p-1.5 text-[#888888] hover:text-white bg-[#1f1f1f] hover:bg-[#2a2a2a] border border-[#333333] transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Current Image Preview */}
+            {uploadedImages[replaceModalCert.id] && (
+              <div className="mb-4 p-3 bg-[#1A1A1A] border border-[#262626] flex items-center gap-3">
+                <div className="w-16 h-16 bg-white p-1 border border-[#333] shrink-0 flex items-center justify-center overflow-hidden shadow-inner">
+                  <img
+                    src={uploadedImages[replaceModalCert.id]}
+                    alt="Current Certificate Preview"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-[#C5A059] block">
+                    Current Image
+                  </span>
+                  <div className="text-xs text-white truncate font-medium">
+                    {replaceModalCert.title}
+                  </div>
+                  <span className="text-[10px] text-[#A0A0A0] font-mono block mt-0.5">
+                    Select a new image below to replace this certificate
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Hidden File Input for Replace Modal */}
+            <input
+              type="file"
+              ref={replaceFileInputRef}
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                if (replaceModalCert) {
+                  handleImageUpload(replaceModalCert.id, e);
+                  setReplaceModalCert(null);
+                }
+              }}
+            />
+
+            {/* Drag & Drop / Click Upload Zone */}
+            <div
+              onClick={() => replaceFileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOverReplace(true);
+              }}
+              onDragLeave={() => setIsDragOverReplace(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOverReplace(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file && replaceModalCert) {
+                  const fakeEvent = {
+                    target: { files: [file], value: '' }
+                  } as unknown as React.ChangeEvent<HTMLInputElement>;
+                  handleImageUpload(replaceModalCert.id, fakeEvent);
+                  setReplaceModalCert(null);
+                }
+              }}
+              className={`w-full border-2 border-dashed p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 select-none group ${
+                isDragOverReplace
+                  ? 'border-[#C5A059] bg-[#C5A059]/10'
+                  : 'border-[#333333] hover:border-[#C5A059] bg-[#181818] hover:bg-[#1e1e1e]'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-full bg-[#141414] border border-[#333333] group-hover:border-[#C5A059] flex items-center justify-center text-[#888888] group-hover:text-[#C5A059] mb-3 group-hover:scale-110 transition-transform shadow-md">
+                <Upload className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-mono font-medium text-white group-hover:text-[#C5A059] transition-colors mb-1">
+                Click to browse or drag & drop replacement image
+              </span>
+              <span className="text-[10px] text-[#777777] font-mono mb-4">
+                Supports JPG, PNG, WebP, GIF • Original aspect ratio preserved
+              </span>
+              <button
+                type="button"
+                className="px-4 py-2 bg-[#C5A059] hover:bg-[#D4AF37] text-black font-semibold text-xs font-mono uppercase tracking-wider transition-colors pointer-events-none"
+              >
+                Choose Replacement Image
+              </button>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-xs font-mono">
+              <button
+                type="button"
+                onClick={(e) => {
+                  if (replaceModalCert) {
+                    handleRemoveImage(replaceModalCert.id, e);
+                    setReplaceModalCert(null);
+                  }
+                }}
+                className="text-[#777777] hover:text-[#ff6b6b] transition-colors cursor-pointer py-1 px-1"
+                title="Remove uploaded certificate image"
+              >
+                Remove Current Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setReplaceModalCert(null)}
+                className="px-4 py-1.5 bg-[#1f1f1f] hover:bg-[#2a2a2a] text-[#cccccc] hover:text-white border border-[#333333] text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
