@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Building, X, ExternalLink, Upload } from 'lucide-react';
+import { Calendar, Building, X, ExternalLink, Upload, Trash2 } from 'lucide-react';
 import { ThemeId, CertificationItem } from '../types';
 import { CERTIFICATIONS, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -220,11 +220,11 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                       </div>
                     ) : (
                       <div>
-                        {/* Certificate Image: Clickable to open the Replace Image Pop-up */}
+                        {/* Certificate Image: Clickable to open the Image Pop-up Modal */}
                         <div
                           onClick={() => setReplaceModalCert(cert)}
                           className="w-full bg-white p-2.5 border border-[#333333] hover:border-[#C5A059] transition-all cursor-pointer group/certimg relative overflow-hidden flex items-center justify-center shadow-lg"
-                          title="Click to replace certification image"
+                          title="Click to manage, replace, or remove certification image"
                           role="button"
                           tabIndex={0}
                           onKeyDown={(e) => {
@@ -244,21 +244,9 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                               <Upload className="w-4 h-4" />
                             </div>
                             <span className="px-3 py-1 bg-[#141414]/95 border border-[#C5A059] text-[#C5A059] text-[10px] font-mono uppercase tracking-wider shadow-md">
-                              Click to Replace Image
+                              Click to Manage / Replace Image
                             </span>
                           </div>
-                        </div>
-
-                        {/* Remove Option only - Always-visible Replace Image button is removed */}
-                        <div className="flex items-center justify-end mt-2 pt-2 border-t border-[#262626] text-[11px] font-mono">
-                          <button
-                            type="button"
-                            onClick={(e) => handleRemoveImage(cert.id, e)}
-                            className="text-[#777777] hover:text-[#ff6b6b] hover:underline cursor-pointer py-1 px-1 transition-colors"
-                            title="Remove uploaded image"
-                          >
-                            Remove
-                          </button>
                         </div>
                       </div>
                     )}
@@ -614,10 +602,11 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                     setReplaceModalCert(null);
                   }
                 }}
-                className="text-[#777777] hover:text-[#ff6b6b] transition-colors cursor-pointer py-1 px-1"
-                title="Remove uploaded certificate image"
+                className="text-[#ff6b6b] hover:text-[#ff9494] hover:bg-red-950/40 border border-red-900/40 hover:border-red-800 transition-all cursor-pointer py-1.5 px-3 flex items-center gap-1.5"
+                title="Remove certification image"
               >
-                Remove Current Image
+                <Trash2 className="w-3.5 h-3.5 text-[#ff6b6b]" />
+                <span>Remove</span>
               </button>
               <button
                 type="button"
