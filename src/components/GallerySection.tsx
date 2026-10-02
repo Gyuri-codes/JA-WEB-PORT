@@ -42,14 +42,14 @@ interface GallerySectionProps {
   currentTheme: ThemeId;
 }
 
-const CATEGORIES = [
-  'All',
-  'Hospitality & Service',
-  'Culinary Craft',
-  'Certificates & Awards',
+const REMOVED_CATEGORIES = new Set([
+  'Creative & Digital',
   'Campus & Events',
-  'Creative & Digital'
-];
+  'Certificates & Awards',
+  'Culinary Craft',
+  'Hospitality & Service',
+  'Hospitality'
+]);
 
 export function GallerySection({ currentTheme }: GallerySectionProps) {
   const themeConfig = THEME_CONFIGS[currentTheme];
@@ -100,7 +100,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
   const [editingImage, setEditingImage] = useState<GalleryImage | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editCaption, setEditCaption] = useState('');
-  const [editCategory, setEditCategory] = useState(CATEGORIES[1]);
+  const [editCategory, setEditCategory] = useState('');
 
   // Notification Toast
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warning' | 'info' } | null>(null);
@@ -202,7 +202,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
             dataUrl,
             title: cleanTitle || 'Untitled Photo',
             caption: '',
-            category: 'Hospitality & Service',
+            category: '',
             uploadedAt: Date.now() + i,
             width,
             height,
@@ -439,17 +439,18 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     setEditingImage(img);
     setEditTitle(img.title);
     setEditCaption(img.caption || '');
-    setEditCategory(img.category || CATEGORIES[1]);
+    setEditCategory(img.category && !REMOVED_CATEGORIES.has(img.category) ? img.category : '');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingImage) return;
 
+    const trimmedCat = editCategory.trim();
     await updateGalleryImage(editingImage.id, {
       title: editTitle.trim() || 'Untitled Photo',
       caption: editCaption.trim(),
-      category: editCategory
+      category: !REMOVED_CATEGORIES.has(trimmedCat) ? trimmedCat : ''
     });
 
     const refreshed = await loadGalleryImages();
@@ -488,6 +489,23 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     setSelectedIds(new Set());
   };
 
+  // Dynamically compute any user-defined categories (strictly excluding the removed categories)
+  const availableCategories = useMemo(() => {
+    const customSet = new Set<string>();
+    images.forEach((img) => {
+      if (img.category && !REMOVED_CATEGORIES.has(img.category)) {
+        customSet.add(img.category);
+      }
+    });
+    return customSet.size > 0 ? ['All', ...Array.from(customSet)] : [];
+  }, [images]);
+
+  useEffect(() => {
+    if (selectedCategory !== 'All' && !availableCategories.includes(selectedCategory)) {
+      setSelectedCategory('All');
+    }
+  }, [availableCategories, selectedCategory]);
+
   // Filtered Photos List for the current active view (either All Photos or Inside Active Album)
   const currentDisplayImages = useMemo(() => {
     let list: GalleryImage[] = [];
@@ -502,7 +520,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     }
 
     if (selectedCategory !== 'All') {
-      list = list.filter((img) => img.category === selectedCategory);
+      list = list.filter((img) => img.category === selectedCategory && !REMOVED_CATEGORIES.has(img.category));
     }
 
     if (searchQuery.trim()) {
@@ -511,7 +529,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
         (img) =>
           img.title.toLowerCase().includes(q) ||
           (img.caption && img.caption.toLowerCase().includes(q)) ||
-          (img.category && img.category.toLowerCase().includes(q))
+          (img.category && !REMOVED_CATEGORIES.has(img.category) && img.category.toLowerCase().includes(q))
       );
     }
 
@@ -816,23 +834,25 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
         {/* Filter, Search & Sort Bar (shown when viewing photos list or inside album) */}
         {(activeTab === 'photos' || activeAlbum) && (
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-6">
-            {/* Category Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`whitespace-nowrap px-3 py-1.5 text-[11px] uppercase tracking-wider font-mono transition-all cursor-pointer shrink-0 ${
-                    selectedCategory === cat
-                      ? 'bg-[#C5A059] text-black font-semibold'
-                      : 'bg-[#141414] text-[#888888] hover:text-white border border-[#262626] hover:border-[#383838]'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            {/* Category Tabs (dynamically rendered only if custom tags exist, strictly excluding removed categories) */}
+            {availableCategories.length > 1 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                {availableCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`whitespace-nowrap px-3 py-1.5 text-[11px] uppercase tracking-wider font-mono transition-all cursor-pointer shrink-0 ${
+                      selectedCategory === cat
+                        ? 'bg-[#C5A059] text-black font-semibold'
+                        : 'bg-[#141414] text-[#888888] hover:text-white border border-[#262626] hover:border-[#383838]'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Search & Sort */}
             <div className="flex items-center gap-3">
@@ -1006,7 +1026,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                   {activeAlbum
                     ? 'This album is currently empty. You can add uploaded photos from your gallery or upload new photos.'
                     : searchQuery || selectedCategory !== 'All'
-                    ? 'Try adjusting your search query or selecting a different category filter.'
+                    ? 'Try adjusting your search query or filters.'
                     : 'Click the "Upload Photos" button above to upload photos to your gallery.'}
                 </p>
 
@@ -1072,9 +1092,13 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                         <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-3">
                           {/* Top Bar on Hover */}
                           <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-mono uppercase tracking-wider text-[#C5A059] bg-black/70 px-2 py-0.5 border border-[#C5A059]/30 truncate max-w-[120px]">
-                              {img.category || 'Hospitality'}
-                            </span>
+                            {img.category && !REMOVED_CATEGORIES.has(img.category) ? (
+                              <span className="text-[9px] font-mono uppercase tracking-wider text-[#C5A059] bg-black/70 px-2 py-0.5 border border-[#C5A059]/30 truncate max-w-[120px]">
+                                {img.category}
+                              </span>
+                            ) : (
+                              <span />
+                            )}
                             <span className="text-[9px] font-mono text-[#A0A0A0]">
                               {new Date(img.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </span>
@@ -1326,7 +1350,9 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
               onClick={(e) => e.stopPropagation()}
             >
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#C5A059] block mb-1">
-                {activeLightboxImage.category || 'Hospitality'} ·{' '}
+                {activeLightboxImage.category && !REMOVED_CATEGORIES.has(activeLightboxImage.category) ? (
+                  <>{activeLightboxImage.category} · </>
+                ) : null}
                 {new Date(activeLightboxImage.uploadedAt).toLocaleDateString('en-US', {
                   month: 'long',
                   day: 'numeric',
@@ -1752,19 +1778,15 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
 
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#999999] mb-1.5">
-                    Category
+                    Category / Tag <span className="text-[#666666] font-normal lowercase">(optional)</span>
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full bg-[#1A1A1A] border border-[#333333] focus:border-[#C5A059] text-xs text-white px-3 py-2 outline-none cursor-pointer"
-                  >
-                    {CATEGORIES.filter((c) => c !== 'All').map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Optional tag (e.g. Highlights, Travel)"
+                    className="w-full bg-[#1A1A1A] border border-[#333333] focus:border-[#C5A059] text-xs text-white px-3 py-2 outline-none"
+                  />
                 </div>
 
                 <div>

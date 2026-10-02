@@ -41,6 +41,22 @@ function openGalleryDB(): Promise<IDBDatabase> {
   });
 }
 
+const REMOVED_GALLERY_CATEGORIES = new Set([
+  'Creative & Digital',
+  'Campus & Events',
+  'Certificates & Awards',
+  'Culinary Craft',
+  'Hospitality & Service',
+  'Hospitality'
+]);
+
+function sanitizeGalleryItem(item: GalleryImage): GalleryImage {
+  if (item.category && REMOVED_GALLERY_CATEGORIES.has(item.category)) {
+    return { ...item, category: undefined };
+  }
+  return item;
+}
+
 /**
  * Loads all stored gallery images from IndexedDB.
  * Only returns images uploaded specifically to the Gallery (unlimited).
@@ -56,7 +72,9 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
 
       request.onsuccess = () => {
         const rawItems: GalleryImage[] = request.result || [];
-        const manualItems = rawItems.filter((item) => !item.id.startsWith('starter-'));
+        const manualItems = rawItems
+          .filter((item) => !item.id.startsWith('starter-'))
+          .map(sanitizeGalleryItem);
         manualItems.sort((a, b) => b.uploadedAt - a.uploadedAt);
         resolve(manualItems);
       };
@@ -70,7 +88,9 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
       if (fallback) {
         const parsed = JSON.parse(fallback);
         if (Array.isArray(parsed)) {
-          return parsed.filter((item: GalleryImage) => !item.id.startsWith('starter-'));
+          return parsed
+            .filter((item: GalleryImage) => !item.id.startsWith('starter-'))
+            .map(sanitizeGalleryItem);
         }
       }
     } catch {
