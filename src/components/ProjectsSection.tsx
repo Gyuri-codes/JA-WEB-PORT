@@ -26,8 +26,7 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
       accentBorder: "border-[#2dd4bf]/80",
       link: ALON_ANINAG_PROJECT_DATA.officialUrl,
       actionText: "View Project",
-      canPreview: true,
-      thumbnail: ALON_ANINAG_PROJECT_DATA.thumbnail
+      canPreview: true
     },
     {
       id: "emberfall-guardians",
@@ -211,31 +210,6 @@ export function ProjectsSection({ currentTheme }: ProjectsSectionProps) {
                     {proj.badgeText}
                   </span>
                 </div>
-
-                {proj.thumbnail && (
-                  <div
-                    onClick={() => proj.canPreview && setPreviewProject({ title: proj.title, url: proj.link })}
-                    className={`mb-4 overflow-hidden border border-[#2a2a2a] bg-[#0c0d10] aspect-video relative group/thumb ${
-                      proj.canPreview ? 'cursor-pointer' : ''
-                    }`}
-                  >
-                    <img
-                      src={proj.thumbnail}
-                      alt={proj.title}
-                      className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A]/80 via-transparent to-transparent opacity-60 group-hover:opacity-30 transition-opacity" />
-                    {proj.canPreview && (
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-white px-2.5 py-1 bg-black/80 border border-white/20 flex items-center gap-1.5 shadow-lg">
-                          <Eye className="w-3 h-3 text-[#2dd4bf]" />
-                          Quick Preview
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <h3 
                   className="text-lg font-serif italic text-white mb-2 leading-snug group-hover:text-[#C5A059] transition-colors"

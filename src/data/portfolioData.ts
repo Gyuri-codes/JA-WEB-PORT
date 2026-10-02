@@ -279,7 +279,6 @@ export const ALON_ANINAG_PROJECT_DATA = {
   tagline: "Where Waves Rest and Souls Glow — A boutique beachfront retreat web application in Poblacion Beach, Sipalay City featuring cozy oceanfront rooms, sunset deck dining, and authentic Negrense hospitality.",
   overview: "A boutique beachfront retreat web application in Poblacion Beach, Sipalay City featuring interactive room booking, sunset dining reservations, curated coastal experiences, and authentic Negrense hospitality.",
   officialUrl: "https://gyuri-codes.github.io/Group-1/",
-  thumbnail: "https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?auto=format&fit=crop&w=1200&q=80",
   category: "Boutique Resort Web Experience",
   tools: ["React", "TypeScript", "Tailwind CSS", "Hospitality UX", "GitHub Pages"],
   highlights: [
