@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Building, X, ExternalLink, Upload, Trash2 } from 'lucide-react';
+import { Calendar, Building, X, ExternalLink, Upload, Trash2, CheckCircle2 } from 'lucide-react';
 import { ThemeId, CertificationItem } from '../types';
 import { CERTIFICATIONS, THEME_CONFIGS } from '../data/portfolioData';
+import {
+  getStoredCertificationsSync,
+  fetchStoredCertifications,
+  saveCertificationImage,
+  removeCertificationImage,
+  CERT_UPDATE_EVENT,
+  StoredCertification,
+} from '../utils/certificationStorage';
 
 interface CertificationsSectionProps {
   currentTheme: ThemeId;
@@ -22,8 +30,6 @@ function DragonIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
   );
 }
 
-const STORAGE_KEY = 'ja_portfolio_cert_images';
-
 export function CertificationsSection({ currentTheme }: CertificationsSectionProps) {
   const themeConfig = THEME_CONFIGS[currentTheme];
   const [popupCert, setPopupCert] = useState<CertificationItem | null>(null);
@@ -35,51 +41,80 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
   const [isDragOverReplace, setIsDragOverReplace] = useState(false);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Client-side uploaded certificate images mapping: cert.id -> dataUrl
-  const [uploadedImages, setUploadedImages] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+  // Stored certifications state: initialized synchronously with permanent data + localStorage
+  const [storedCerts, setStoredCerts] = useState<Record<string, StoredCertification>>(() => {
+    return getStoredCertificationsSync();
   });
+  const [isSavingCertId, setIsSavingCertId] = useState<string | null>(null);
+
+  // Sync with server API on mount and listen to global updates
+  useEffect(() => {
+    let isMounted = true;
+    fetchStoredCertifications().then((data) => {
+      if (isMounted) setStoredCerts(data);
+    });
+
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<Record<string, StoredCertification>>;
+      if (customEvent.detail) {
+        setStoredCerts({ ...customEvent.detail });
+      } else {
+        setStoredCerts(getStoredCertificationsSync());
+      }
+    };
+
+    window.addEventListener(CERT_UPDATE_EVENT, handleUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener(CERT_UPDATE_EVENT, handleUpdate);
+    };
+  }, []);
 
   const handleImageUpload = (certId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const certMeta = CERTIFICATIONS.find((c) => c.id === certId);
+    setIsSavingCertId(certId);
+
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const dataUrl = event.target?.result as string;
       if (dataUrl) {
-        setUploadedImages((prev) => {
-          const next = { ...prev, [certId]: dataUrl };
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-          } catch (err) {
-            console.warn('Could not save certificate image to localStorage', err);
-          }
-          return next;
-        });
+        try {
+          const savedItem = await saveCertificationImage(certId, dataUrl, {
+            title: certMeta?.title,
+            issuer: certMeta?.issuer,
+            badgeLevel: certMeta?.badgeLevel,
+            description: certMeta?.description,
+            date: certMeta?.date,
+          });
+          setStoredCerts((prev) => ({ ...prev, [certId]: savedItem }));
+        } catch (err) {
+          console.error('Failed to save certification image:', err);
+        } finally {
+          setIsSavingCertId(null);
+        }
+      } else {
+        setIsSavingCertId(null);
       }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
-  const handleRemoveImage = (certId: string, e: React.MouseEvent) => {
+  const handleRemoveImage = async (certId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setUploadedImages((prev) => {
-      const next = { ...prev };
-      delete next[certId];
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch (err) {
-        console.warn('Could not update localStorage', err);
-      }
-      return next;
-    });
+    try {
+      await removeCertificationImage(certId);
+      setStoredCerts((prev) => {
+        const next = { ...prev };
+        delete next[certId];
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to remove certification image:', err);
+    }
     if (popupCert?.id === certId) {
       setPopupCert(null);
       setIsEnlarged(false);
@@ -124,7 +159,9 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [replaceModalCert]);
 
-  const activeModalImage = popupCert ? uploadedImages[popupCert.id] : undefined;
+  const activeModalImage = popupCert
+    ? storedCerts[popupCert.id]?.imageUrl || storedCerts[popupCert.id]?.dataUrl
+    : undefined;
 
   return (
     <section id="certifications" className="py-24 px-4 sm:px-6 lg:px-8 relative z-10 border-t border-[#222222]">
@@ -148,7 +185,7 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
         {/* Credentials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {CERTIFICATIONS.map((cert) => {
-            const currentImg = uploadedImages[cert.id];
+            const currentImg = storedCerts[cert.id]?.imageUrl || storedCerts[cert.id]?.dataUrl;
 
             return (
               <div
@@ -512,11 +549,11 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
             </div>
 
             {/* Current Image Preview */}
-            {uploadedImages[replaceModalCert.id] && (
+            {storedCerts[replaceModalCert.id] && (
               <div className="mb-4 p-3 bg-[#1A1A1A] border border-[#262626] flex items-center gap-3">
                 <div className="w-16 h-16 bg-white p-1 border border-[#333] shrink-0 flex items-center justify-center overflow-hidden shadow-inner">
                   <img
-                    src={uploadedImages[replaceModalCert.id]}
+                    src={storedCerts[replaceModalCert.id]?.imageUrl || storedCerts[replaceModalCert.id]?.dataUrl}
                     alt="Current Certificate Preview"
                     className="max-w-full max-h-full object-contain"
                   />

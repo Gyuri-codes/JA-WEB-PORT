@@ -48,9 +48,183 @@ function portraitSaverPlugin(): Plugin {
   };
 }
 
+function certificationsSaverPlugin(): Plugin {
+  return {
+    name: 'certifications-saver',
+    configureServer(server) {
+      const handleCertRequest = async (req: any, res: any) => {
+        const jsonPath = path.resolve(__dirname, 'src/data/savedCertifications.json');
+        const publicJsonPath = path.resolve(__dirname, 'public/data/savedCertifications.json');
+        const uploadDir = path.resolve(__dirname, 'public/uploads/certifications');
+
+        const readCertData = async () => {
+          try {
+            const raw = await fs.readFile(jsonPath, 'utf-8');
+            return JSON.parse(raw);
+          } catch {
+            try {
+              const raw = await fs.readFile(publicJsonPath, 'utf-8');
+              return JSON.parse(raw);
+            } catch {
+              return {};
+            }
+          }
+        };
+
+        const writeCertData = async (data: Record<string, any>) => {
+          const str = JSON.stringify(data, null, 2);
+          await fs.mkdir(path.dirname(jsonPath), { recursive: true });
+          await fs.mkdir(path.dirname(publicJsonPath), { recursive: true });
+          await fs.writeFile(jsonPath, str, 'utf-8');
+          await fs.writeFile(publicJsonPath, str, 'utf-8');
+        };
+
+        if (req.method === 'GET') {
+          try {
+            const data = await readCertData();
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            });
+            res.end(JSON.stringify({ success: true, data }));
+            return;
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to read certifications' }));
+            return;
+          }
+        }
+
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body);
+              const { certId, dataUrl, title, issuer, badgeLevel, description, date } = payload;
+              if (!certId || !dataUrl) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing certId or dataUrl' }));
+                return;
+              }
+
+              await fs.mkdir(uploadDir, { recursive: true });
+
+              let ext = 'png';
+              let base64Data = dataUrl;
+              const match = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+              if (match) {
+                ext = match[1] === 'svg+xml' ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
+                base64Data = match[2];
+              }
+
+              const fileName = `${certId}.${ext}`;
+              const filePath = path.resolve(uploadDir, fileName);
+              const buf = Buffer.from(base64Data, 'base64');
+              await fs.writeFile(filePath, buf);
+
+              const currentData = await readCertData();
+              const updatedItem = {
+                certId,
+                imageUrl: `/JA-WEB-PORT/uploads/certifications/${fileName}?v=${Date.now()}`,
+                title: title || currentData[certId]?.title || certId,
+                issuer: issuer || currentData[certId]?.issuer || '',
+                badgeLevel: badgeLevel || currentData[certId]?.badgeLevel || '',
+                description: description || currentData[certId]?.description || '',
+                date: date || currentData[certId]?.date || '',
+                uploadedAt: Date.now(),
+              };
+
+              currentData[certId] = updatedItem;
+              await writeCertData(currentData);
+
+              res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              });
+              res.end(JSON.stringify({ success: true, item: updatedItem, data: currentData }));
+              return;
+            } catch (err) {
+              console.error('Save certification error:', err);
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Failed to save certification image' }));
+            }
+          });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              let certId = '';
+              try {
+                const parsed = JSON.parse(body);
+                certId = parsed.certId;
+              } catch {
+                const url = new URL(req.url, 'http://localhost');
+                certId = url.searchParams.get('certId') || '';
+              }
+
+              if (!certId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing certId' }));
+                return;
+              }
+
+              const currentData = await readCertData();
+              delete currentData[certId];
+              await writeCertData(currentData);
+
+              try {
+                const files = await fs.readdir(uploadDir);
+                for (const f of files) {
+                  if (f.startsWith(`${certId}.`)) {
+                    await fs.unlink(path.resolve(uploadDir, f));
+                  }
+                }
+              } catch {
+                // ignore deletion error if file does not exist
+              }
+
+              res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              });
+              res.end(JSON.stringify({ success: true, data: currentData }));
+              return;
+            } catch (err) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Failed to delete certification' }));
+            }
+          });
+          return;
+        }
+
+        res.writeHead(405);
+        res.end();
+      };
+
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0];
+        if (url === '/api/certifications' || url === '/JA-WEB-PORT/api/certifications') {
+          handleCertRequest(req, res);
+        } else {
+          next();
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/JA-WEB-PORT/',
-  plugins: [react(), tailwindcss(), portraitSaverPlugin()],
+  plugins: [react(), tailwindcss(), portraitSaverPlugin(), certificationsSaverPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
