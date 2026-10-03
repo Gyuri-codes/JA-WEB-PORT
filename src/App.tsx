@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ThemeId, NavSectionId, SettingsState } from './types';
 import { THEME_CONFIGS } from './data/portfolioData';
+import { MythicDynastyBackground } from './components/MythicDynastyBackground';
 import { BackgroundCanvas } from './components/BackgroundCanvas';
 import { Navigation } from './components/Navigation';
 import { HeroSection } from './components/HeroSection';
@@ -190,11 +191,15 @@ export default function App() {
         aria-hidden="true" 
       />
 
-      {/* Dynamic Animated Procedural Canvas */}
-      <BackgroundCanvas
-        theme={currentTheme}
-        reducedMotion={settings.reducedMotion}
-      />
+      {/* Mythic Dynasty Procedural Animated Background or Universal Canvas */}
+      {currentTheme === 'mythic' ? (
+        <MythicDynastyBackground reducedMotion={settings.reducedMotion} />
+      ) : (
+        <BackgroundCanvas
+          theme={currentTheme}
+          reducedMotion={settings.reducedMotion}
+        />
+      )}
 
       {/* Universe Warp Portal Overlay on Theme Shift */}
       {isWarping && (
