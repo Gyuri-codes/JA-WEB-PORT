@@ -200,6 +200,30 @@ export const SKILLS_DATA = {
       tools: ["Pitch Decks", "Slide Architecture", "Visual Hierarchy"],
       level: 93,
       context: "Structured keynote presentations, persuasive pitch decks, data visualization, and polished corporate aesthetics."
+    },
+    {
+      name: "Poster & Layout Design",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["Adobe Photoshop", "Canva", "Print & Digital Layouts"],
+      level: 89,
+      context: "Designing structured promotional posters, announcements, menu collaterals, and print-ready event flyers with clean visual hierarchy."
+    },
+    {
+      name: "Event Documentation",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["Event Photography", "Media Capture", "Photo Curation"],
+      level: 87,
+      context: "Capturing and curating hospitality banquets, campus events, culinary presentations, and organizing photo and media archives for recaps and portfolios."
+    },
+    {
+      name: "AI-Assisted Creative Work",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["AI Studio", "Iterative Prompting", "Creative Prototyping"],
+      level: 86,
+      context: "Collaborating with AI Studio to brainstorm creative concepts, structure project workflows, and bring interactive digital ideas and web experiences to life."
     }
   ],
   humanCentered: [

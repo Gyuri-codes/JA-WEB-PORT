@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Cloud, Palette, Film, Share2, Presentation } from 'lucide-react';
+import { FileText, Cloud, Palette, Film, Share2, Presentation, Layout, Camera, Sparkles } from 'lucide-react';
 import { ThemeId } from '../types';
 import { SKILLS_DATA, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -25,6 +25,12 @@ export function SkillsSection({ currentTheme }: SkillsSectionProps) {
         return <Share2 className="w-5 h-5 text-cyan-400" />;
       case 'Presentation Design':
         return <Presentation className="w-5 h-5 text-emerald-400" />;
+      case 'Poster & Layout Design':
+        return <Layout className="w-5 h-5 text-orange-400" />;
+      case 'Event Documentation':
+        return <Camera className="w-5 h-5 text-teal-400" />;
+      case 'AI-Assisted Creative Work':
+        return <Sparkles className="w-5 h-5 text-yellow-400" />;
       default:
         return <FileText className="w-5 h-5 text-[#C5A059]" />;
     }
