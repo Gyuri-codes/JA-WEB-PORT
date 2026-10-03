@@ -55,7 +55,9 @@ function certificationsSaverPlugin(): Plugin {
       const handleCertRequest = async (req: any, res: any) => {
         const jsonPath = path.resolve(__dirname, 'src/data/savedCertifications.json');
         const publicJsonPath = path.resolve(__dirname, 'public/data/savedCertifications.json');
+        const distJsonPath = path.resolve(__dirname, 'dist/data/savedCertifications.json');
         const uploadDir = path.resolve(__dirname, 'public/uploads/certifications');
+        const distUploadDir = path.resolve(__dirname, 'dist/uploads/certifications');
 
         const readCertData = async () => {
           try {
@@ -77,6 +79,12 @@ function certificationsSaverPlugin(): Plugin {
           await fs.mkdir(path.dirname(publicJsonPath), { recursive: true });
           await fs.writeFile(jsonPath, str, 'utf-8');
           await fs.writeFile(publicJsonPath, str, 'utf-8');
+          try {
+            await fs.mkdir(path.dirname(distJsonPath), { recursive: true });
+            await fs.writeFile(distJsonPath, str, 'utf-8');
+          } catch {
+            // ignore if dist not built yet
+          }
         };
 
         if (req.method === 'GET') {
@@ -124,6 +132,12 @@ function certificationsSaverPlugin(): Plugin {
               const filePath = path.resolve(uploadDir, fileName);
               const buf = Buffer.from(base64Data, 'base64');
               await fs.writeFile(filePath, buf);
+              try {
+                await fs.mkdir(distUploadDir, { recursive: true });
+                await fs.writeFile(path.resolve(distUploadDir, fileName), buf);
+              } catch {
+                // ignore if dist not built yet
+              }
 
               const currentData = await readCertData();
               const updatedItem = {
@@ -188,9 +202,16 @@ function certificationsSaverPlugin(): Plugin {
                     await fs.unlink(path.resolve(uploadDir, f));
                   }
                 }
-              } catch {
-                // ignore deletion error if file does not exist
-              }
+              } catch {}
+
+              try {
+                const distFiles = await fs.readdir(distUploadDir);
+                for (const f of distFiles) {
+                  if (f.startsWith(`${certId}.`)) {
+                    await fs.unlink(path.resolve(distUploadDir, f));
+                  }
+                }
+              } catch {}
 
               res.writeHead(200, {
                 'Content-Type': 'application/json',
