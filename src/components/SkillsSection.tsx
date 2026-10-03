@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Ear, Layers, RefreshCw, Cpu, Sparkles, Code2, BrainCircuit, HeartHandshake } from 'lucide-react';
+import { FileText, Cloud, Palette, Film, Share2, Presentation } from 'lucide-react';
 import { ThemeId } from '../types';
 import { SKILLS_DATA, THEME_CONFIGS } from '../data/portfolioData';
 
@@ -8,31 +8,31 @@ interface SkillsSectionProps {
 }
 
 export function SkillsSection({ currentTheme }: SkillsSectionProps) {
-  const [activeTab, setActiveTab] = useState<'all' | 'hospitality' | 'technology'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'office' | 'design'>('all');
   const themeConfig = THEME_CONFIGS[currentTheme];
 
   const getIcon = (name: string) => {
     switch (name) {
-      case 'Active Listening':
-        return <Ear className="w-5 h-5 text-emerald-400" />;
-      case 'Multitasking':
-        return <Layers className="w-5 h-5 text-indigo-400" />;
-      case 'Adaptability':
-        return <RefreshCw className="w-5 h-5 text-amber-400" />;
-      case 'AI-Assisted Creation':
-        return <BrainCircuit className="w-5 h-5 text-cyan-400" />;
-      case 'Creative Technology':
-        return <Sparkles className="w-5 h-5 text-purple-400" />;
-      case 'Experimental Digital Projects':
-        return <Code2 className="w-5 h-5 text-rose-400" />;
+      case 'Microsoft Office':
+        return <FileText className="w-5 h-5 text-blue-400" />;
+      case 'Google Workspace':
+        return <Cloud className="w-5 h-5 text-amber-400" />;
+      case 'Basic Graphic Design':
+        return <Palette className="w-5 h-5 text-pink-400" />;
+      case 'Basic Video Editing':
+        return <Film className="w-5 h-5 text-purple-400" />;
+      case 'Social Media Content Design':
+        return <Share2 className="w-5 h-5 text-cyan-400" />;
+      case 'Presentation Design':
+        return <Presentation className="w-5 h-5 text-emerald-400" />;
       default:
-        return <HeartHandshake className="w-5 h-5 text-emerald-400" />;
+        return <FileText className="w-5 h-5 text-[#C5A059]" />;
     }
   };
 
   const allSkills = [
-    ...SKILLS_DATA.humanCentered.map(s => ({ ...s, category: 'hospitality' })),
-    ...SKILLS_DATA.digitalCuriosity.map(s => ({ ...s, category: 'technology' }))
+    ...SKILLS_DATA.officeWorkspace,
+    ...SKILLS_DATA.multimediaDesign
   ];
 
   const displayedSkills = allSkills.filter(s => activeTab === 'all' || s.category === activeTab);
@@ -52,40 +52,43 @@ export function SkillsSection({ currentTheme }: SkillsSectionProps) {
             Capabilities & Disciplines
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] max-w-2xl mx-auto font-light leading-relaxed">
-            Grounded in active listening and hospitality service, enhanced by modern AI workflows and iterative digital experimentation.
+            Proficiency across office productivity suites, collaborative cloud tools, graphic design, and multimedia production workflows.
           </p>
 
           {/* Filter Tabs */}
-          <div className="inline-flex p-1 bg-[#141414] border border-[#333333] mt-8 gap-1">
+          <div className="inline-flex p-1 bg-[#141414] border border-[#333333] mt-8 gap-1 flex-wrap justify-center">
             <button
+              type="button"
               onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 text-[10px] uppercase tracking-[0.25em] font-semibold transition-all ${
+              className={`px-4 py-2 text-[10px] uppercase tracking-[0.25em] font-semibold transition-all cursor-pointer ${
                 activeTab === 'all'
                   ? 'bg-[#C5A059] text-[#0F0F0F]'
                   : 'text-[#888888] hover:text-[#C5A059]'
               }`}
             >
-              All Disciplines ({allSkills.length})
+              All Skills ({allSkills.length})
             </button>
             <button
-              onClick={() => setActiveTab('hospitality')}
-              className={`px-4 py-2 text-[10px] uppercase tracking-[0.25em] font-semibold transition-all ${
-                activeTab === 'hospitality'
+              type="button"
+              onClick={() => setActiveTab('office')}
+              className={`px-4 py-2 text-[10px] uppercase tracking-[0.25em] font-semibold transition-all cursor-pointer ${
+                activeTab === 'office'
                   ? 'bg-[#C5A059] text-[#0F0F0F]'
                   : 'text-[#888888] hover:text-[#C5A059]'
               }`}
             >
-              Hospitality & People
+              Office & Workspace ({SKILLS_DATA.officeWorkspace.length})
             </button>
             <button
-              onClick={() => setActiveTab('technology')}
-              className={`px-4 py-2 text-[10px] uppercase tracking-[0.25em] font-semibold transition-all ${
-                activeTab === 'technology'
+              type="button"
+              onClick={() => setActiveTab('design')}
+              className={`px-4 py-2 text-[10px] uppercase tracking-[0.25em] font-semibold transition-all cursor-pointer ${
+                activeTab === 'design'
                   ? 'bg-[#C5A059] text-[#0F0F0F]'
                   : 'text-[#888888] hover:text-[#C5A059]'
               }`}
             >
-              Creative & AI Tech
+              Graphic Design & Multimedia ({SKILLS_DATA.multimediaDesign.length})
             </button>
           </div>
         </div>
@@ -114,9 +117,23 @@ export function SkillsSection({ currentTheme }: SkillsSectionProps) {
                 >
                   {skill.name}
                 </h3>
-                <p className="text-xs text-[#999999] leading-relaxed mb-6 font-light">
+                <p className="text-xs text-[#999999] leading-relaxed mb-4 font-light">
                   {skill.context}
                 </p>
+
+                {/* Sub-skills / Tools list */}
+                {skill.tools && skill.tools.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-6">
+                    {skill.tools.map((tool) => (
+                      <span
+                        key={tool}
+                        className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-[#141414] text-[#A0A0A0] border border-[#2a2a2a] group-hover:border-[#3a3a3a] transition-colors"
+                      >
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Visual Progress Bar */}
@@ -130,7 +147,7 @@ export function SkillsSection({ currentTheme }: SkillsSectionProps) {
                   />
                 </div>
                 <div className="flex justify-between items-center text-[9px] font-mono text-[#666666] mt-2 uppercase tracking-widest">
-                  <span>{skill.category === 'hospitality' ? 'Human Core' : 'Digital Edge'}</span>
+                  <span>{skill.categoryLabel}</span>
                   <span>Proficiency</span>
                 </div>
               </div>
@@ -138,10 +155,12 @@ export function SkillsSection({ currentTheme }: SkillsSectionProps) {
           ))}
         </div>
 
-        {/* Technology positioning note */}
+        {/* Competencies Note */}
         <div className="mt-14 p-5 bg-[#141414] border border-[#262626] text-center max-w-2xl mx-auto text-xs text-[#888888] font-light">
-          <span className="text-[#C5A059] uppercase tracking-wider font-mono text-[10px] block mb-1">Authentic Practice Note</span>
-          Jeric builds digital experiments using AI-assisted creation and rapid web tooling, translating real hospitality problem-solving into interactive experiences.
+          <span className="text-[#C5A059] uppercase tracking-wider font-mono text-[10px] block mb-1">
+            Technical & Creative Core
+          </span>
+          Proficiency spanning industry-standard office suites, collaborative cloud tools, visual content creation, and multimedia editing platforms.
         </div>
       </div>
     </section>

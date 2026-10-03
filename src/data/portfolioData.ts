@@ -150,6 +150,58 @@ export const CERTIFICATIONS: CertificationItem[] = [
 ];
 
 export const SKILLS_DATA = {
+  officeWorkspace: [
+    {
+      name: "Microsoft Office",
+      category: "office",
+      categoryLabel: "Office & Workspace",
+      tools: ["Word", "Excel", "PowerPoint"],
+      level: 95,
+      context: "Comprehensive document formatting, complex spreadsheets, data formulas, and executive slide presentations."
+    },
+    {
+      name: "Google Workspace",
+      category: "office",
+      categoryLabel: "Office & Workspace",
+      tools: ["Docs", "Sheets", "Slides"],
+      level: 94,
+      context: "Cloud-first team collaboration, shared documentation, real-time spreadsheet management, and interactive slides."
+    }
+  ],
+  multimediaDesign: [
+    {
+      name: "Basic Graphic Design",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["Adobe Photoshop", "Canva"],
+      level: 90,
+      context: "Creative graphic assets, promotional marketing material, photo manipulation, and brand identity design."
+    },
+    {
+      name: "Basic Video Editing",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["CapCut", "Filmora", "Adobe Premiere Pro", "DaVinci Resolve"],
+      level: 88,
+      context: "Multi-track video assembly, sound synchronization, dynamic cuts, pacing, color balance, and social format exports."
+    },
+    {
+      name: "Social Media Content Design",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["Social Graphics", "Feed Layouts", "Promotional Banners"],
+      level: 92,
+      context: "Audience-targeted visual posts, campaign banners, stories, and feed aesthetic curation across digital channels."
+    },
+    {
+      name: "Presentation Design",
+      category: "design",
+      categoryLabel: "Design & Multimedia",
+      tools: ["Pitch Decks", "Slide Architecture", "Visual Hierarchy"],
+      level: 93,
+      context: "Structured keynote presentations, persuasive pitch decks, data visualization, and polished corporate aesthetics."
+    }
+  ],
   humanCentered: [
     { name: "Active Listening", level: 95, context: "Understanding unspoken guest expectations and requirements with empathy" },
     { name: "Multitasking", level: 92, context: "Balancing fast-paced floor operations, order prep, and client attention" },
