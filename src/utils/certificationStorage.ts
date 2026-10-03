@@ -13,7 +13,7 @@ export interface StoredCertification {
   uploadedAt: number;
 }
 
-const STORAGE_KEY = 'ja_portfolio_cert_images_v2';
+const STORAGE_KEY = 'ja_portfolio_cert_images_v3';
 export const CERT_UPDATE_EVENT = 'ja_certification_images_updated';
 
 // In-memory runtime cache
@@ -65,6 +65,14 @@ export function getStoredCertificationsSync(): Record<string, StoredCertificatio
     return memoryCache;
   }
 
+  // Clear any old legacy cache keys from previous versions
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('ja_portfolio_cert_images');
+      localStorage.removeItem('ja_portfolio_cert_images_v2');
+    } catch {}
+  }
+
   // 1. Start with permanent bundled data as base
   const bundled = normalizeSavedData(defaultSavedCerts);
   let localData: Record<string, StoredCertification> = {};
@@ -90,10 +98,8 @@ export function getStoredCertificationsSync(): Record<string, StoredCertificatio
  * Keeps permanent server files and client state in sync across devices.
  */
 export async function fetchStoredCertifications(): Promise<Record<string, StoredCertification>> {
-  const syncData = getStoredCertificationsSync();
-
   if (typeof window === 'undefined') {
-    return syncData;
+    return getStoredCertificationsSync();
   }
 
   const endpoints = [
@@ -107,10 +113,10 @@ export async function fetchStoredCertifications(): Promise<Record<string, Stored
       const res = await fetch(url, { cache: 'no-cache' });
       if (res.ok) {
         const json = await res.json();
-        const serverData = json.data || json;
+        const serverData = json.data !== undefined ? json.data : json;
         if (serverData && typeof serverData === 'object') {
           const normalizedServer = normalizeSavedData(serverData);
-          memoryCache = { ...syncData, ...normalizedServer };
+          memoryCache = normalizedServer;
 
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryCache));
@@ -127,7 +133,7 @@ export async function fetchStoredCertifications(): Promise<Record<string, Stored
     }
   }
 
-  return syncData;
+  return getStoredCertificationsSync();
 }
 
 /**
