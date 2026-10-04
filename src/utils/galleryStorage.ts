@@ -6,15 +6,62 @@ const DB_VERSION = 2;
 const STORE_NAME = 'gallery_items_v2';
 const ALBUM_STORE_NAME = 'gallery_albums_v2';
 
-// Ensure any legacy trial databases from earlier test versions are cleaned up
-if (typeof window !== 'undefined') {
-  try {
-    localStorage.removeItem('ja_gallery_fallback_v1');
-    if (window.indexedDB && window.indexedDB.deleteDatabase) {
-      window.indexedDB.deleteDatabase('JA_GALLERY_DB_V1');
-    }
-  } catch {
-    // Ignore legacy cleanup errors
+const DELETED_IDS_KEY = 'ja_gallery_deleted_ids_v3';
+const PUBLIC_META_KEY = 'ja_gallery_public_meta_v2';
+
+// In-memory set of deleted IDs to avoid resurrection
+const inMemoryDeletedIds = new Set<string>();
+
+/**
+ * Returns all deleted image IDs recorded locally and from bundled data.
+ */
+export function getDeletedImageIds(): Set<string> {
+  const ids = new Set<string>(inMemoryDeletedIds);
+
+  const bundledDeleted: string[] = Array.isArray((defaultGalleryData as any)?.deletedIds)
+    ? (defaultGalleryData as any).deletedIds
+    : [];
+  bundledDeleted.forEach((id) => ids.add(id));
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(DELETED_IDS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((id: string) => ids.add(id));
+        }
+      }
+    } catch {}
+  }
+  return ids;
+}
+
+/**
+ * Permanently records deleted image IDs in memory and localStorage.
+ */
+export function recordDeletedImageIds(newIds: string[]): void {
+  newIds.forEach((id) => inMemoryDeletedIds.add(id));
+  if (typeof window !== 'undefined') {
+    try {
+      const all = getDeletedImageIds();
+      newIds.forEach((id) => all.add(id));
+      localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(all)));
+    } catch {}
+  }
+}
+
+/**
+ * Unmarks image IDs from deleted set if they are re-uploaded.
+ */
+export function unmarkImageAsDeleted(ids: string[]): void {
+  ids.forEach((id) => inMemoryDeletedIds.delete(id));
+  if (typeof window !== 'undefined') {
+    try {
+      const all = getDeletedImageIds();
+      ids.forEach((id) => all.delete(id));
+      localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(all)));
+    } catch {}
   }
 }
 
@@ -75,7 +122,6 @@ function sanitizeGalleryItem(item: GalleryImage): GalleryImage {
   if (item.category && REMOVED_GALLERY_CATEGORIES.has(item.category)) {
     return { ...item, category: undefined };
   }
-  // Ensure image URL is resolved to public repository path
   const raw = item.dataUrl || item.imageUrl || '';
   const resolved = resolveImageUrl(raw);
   return {
@@ -91,8 +137,11 @@ function sanitizeGalleryItem(item: GalleryImage): GalleryImage {
  * 1. Permanent repository-hosted images bundled in `galleryImages.json` and served by GitHub Pages
  * 2. Freshly fetched data from live `/api/gallery` or `/JA-WEB-PORT/data/galleryImages.json`
  * 3. Local IndexedDB cache for immediate responsiveness
+ * Strips any permanently deleted image IDs.
  */
 export async function loadGalleryImages(): Promise<GalleryImage[]> {
+  const deletedSet = getDeletedImageIds();
+
   // 1. Start with permanent bundled repository images
   const bundledRaw: any[] = Array.isArray((defaultGalleryData as any)?.images)
     ? (defaultGalleryData as any).images
@@ -124,7 +173,7 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
   let localFallback: GalleryImage[] = [];
   if (typeof window !== 'undefined') {
     try {
-      const cached = localStorage.getItem('ja_gallery_public_meta_v2');
+      const cached = localStorage.getItem(PUBLIC_META_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
@@ -150,6 +199,10 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
         if (res.ok) {
           const json = await res.json();
           const list = json.data?.images || json.images;
+          const remoteDeleted = json.data?.deletedIds || json.deletedIds;
+          if (Array.isArray(remoteDeleted)) {
+            recordDeletedImageIds(remoteDeleted);
+          }
           if (Array.isArray(list)) {
             remoteImages = list.map(sanitizeGalleryItem);
             break;
@@ -161,30 +214,42 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
     }
   }
 
-  // Merge sources: remote/bundled images are repository-permanent, localItems overlay new additions
+  // Refresh deleted set after potential remote fetch
+  const currentDeleted = getDeletedImageIds();
+
+  // Merge sources
   const mergedMap = new Map<string, GalleryImage>();
 
-  // Add bundled first
-  bundledImages.forEach((img) => mergedMap.set(img.id, img));
-  // Overlay remote
-  remoteImages.forEach((img) => mergedMap.set(img.id, img));
-  // Overlay local fallback
-  localFallback.forEach((img) => {
-    if (!mergedMap.has(img.id)) {
-      mergedMap.set(img.id, img);
-    }
-  });
-  // Overlay local items
-  localItems.forEach((img) => {
-    if (!mergedMap.has(img.id) || (img.dataUrl && img.dataUrl.startsWith('data:'))) {
+  bundledImages.forEach((img) => {
+    if (!currentDeleted.has(img.id)) {
       mergedMap.set(img.id, img);
     }
   });
 
-  const finalImages = Array.from(mergedMap.values());
+  remoteImages.forEach((img) => {
+    if (!currentDeleted.has(img.id)) {
+      mergedMap.set(img.id, img);
+    }
+  });
+
+  localFallback.forEach((img) => {
+    if (!currentDeleted.has(img.id) && !mergedMap.has(img.id)) {
+      mergedMap.set(img.id, img);
+    }
+  });
+
+  localItems.forEach((img) => {
+    if (!currentDeleted.has(img.id)) {
+      if (!mergedMap.has(img.id) || (img.dataUrl && img.dataUrl.startsWith('data:'))) {
+        mergedMap.set(img.id, img);
+      }
+    }
+  });
+
+  const finalImages = Array.from(mergedMap.values()).filter((img) => !currentDeleted.has(img.id));
   finalImages.sort((a, b) => b.uploadedAt - a.uploadedAt);
 
-  // Sync back to IndexedDB so local cache is fresh
+  // Sync back to IndexedDB so local cache is clean
   try {
     const db = await openGalleryDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
@@ -205,12 +270,15 @@ export async function saveGalleryImage(image: GalleryImage): Promise<{ success: 
 
 /**
  * Saves multiple gallery images permanently.
- * Persists to IndexedDB and posts to server API to save physical files in repository (public/uploads/gallery/).
+ * Persists to IndexedDB and posts to server API to save physical files in repository (public/assets/gallery/).
  */
 export async function saveMultipleGalleryImages(
   newImages: GalleryImage[]
 ): Promise<{ added: number; total: number }> {
   try {
+    const newIds = newImages.map((img) => img.id);
+    unmarkImageAsDeleted(newIds);
+
     const db = await openGalleryDB();
 
     // 1. Immediately store in IndexedDB
@@ -257,12 +325,12 @@ export async function saveMultipleGalleryImages(
 
     if (typeof window !== 'undefined') {
       try {
-        const shallow = currentImages.map(img => ({
+        const shallow = currentImages.map((img) => ({
           ...img,
           dataUrl: resolveImageUrl(img.dataUrl || img.imageUrl),
           imageUrl: resolveImageUrl(img.imageUrl || img.dataUrl),
         }));
-        localStorage.setItem('ja_gallery_public_meta_v2', JSON.stringify(shallow));
+        localStorage.setItem(PUBLIC_META_KEY, JSON.stringify(shallow));
       } catch {}
     }
 
@@ -303,7 +371,6 @@ export async function updateGalleryImage(id: string, updates: Partial<GalleryIma
       getReq.onerror = () => reject(getReq.error);
     });
 
-    // Sync with server if available
     if (typeof window !== 'undefined') {
       const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
       for (const url of endpoints) {
@@ -333,10 +400,12 @@ export async function deleteGalleryImage(id: string): Promise<boolean> {
 }
 
 /**
- * Deletes multiple images by ID array and removes them from albums and server files.
+ * Deletes multiple images by ID array and permanently removes them from albums and server files.
  */
 export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolean> {
   try {
+    recordDeletedImageIds(ids);
+
     const db = await openGalleryDB();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction([STORE_NAME, ALBUM_STORE_NAME], 'readwrite');
@@ -367,12 +436,12 @@ export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolea
     // Delete in localStorage fallback
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('ja_gallery_public_meta_v2');
+        const cached = localStorage.getItem(PUBLIC_META_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
             const filtered = parsed.filter((item: any) => !ids.includes(item.id));
-            localStorage.setItem('ja_gallery_public_meta_v2', JSON.stringify(filtered));
+            localStorage.setItem(PUBLIC_META_KEY, JSON.stringify(filtered));
           }
         }
       } catch {}
@@ -391,6 +460,7 @@ export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolea
           break;
         } catch {}
       }
+      window.dispatchEvent(new CustomEvent('ja_gallery_images_updated'));
     }
 
     return true;
@@ -405,10 +475,11 @@ export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolea
  */
 export async function clearAllGalleryImages(): Promise<boolean> {
   try {
-    const db = await openGalleryDB();
     const allImages = await loadGalleryImages();
     const ids = allImages.map((i) => i.id);
+    recordDeletedImageIds(ids);
 
+    const db = await openGalleryDB();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction([STORE_NAME, ALBUM_STORE_NAME], 'readwrite');
       const imgStore = tx.objectStore(STORE_NAME);
@@ -430,6 +501,10 @@ export async function clearAllGalleryImages(): Promise<boolean> {
       tx.onerror = () => reject(tx.error);
     });
 
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(PUBLIC_META_KEY);
+    }
+
     if (ids.length > 0 && typeof window !== 'undefined') {
       const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
       for (const url of endpoints) {
@@ -442,6 +517,7 @@ export async function clearAllGalleryImages(): Promise<boolean> {
           break;
         } catch {}
       }
+      window.dispatchEvent(new CustomEvent('ja_gallery_images_updated'));
     }
 
     return true;
@@ -478,7 +554,6 @@ export async function loadGalleryAlbums(): Promise<GalleryAlbum[]> {
     console.warn('Could not read IndexedDB albums:', err);
   }
 
-  // Merge bundled & local
   const albumMap = new Map<string, GalleryAlbum>();
   bundledAlbums.forEach((a) => albumMap.set(a.id, a));
   localAlbums.forEach((a) => albumMap.set(a.id, a));
@@ -497,23 +572,35 @@ export async function saveGalleryAlbum(album: GalleryAlbum): Promise<boolean> {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
       const store = tx.objectStore(ALBUM_STORE_NAME);
-      const req = store.put(album);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      store.put(album);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
 
     const currentAlbums = await loadGalleryAlbums();
-    syncAlbumsToServer(currentAlbums);
+    if (typeof window !== 'undefined') {
+      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+      for (const url of endpoints) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'save_albums', albums: currentAlbums }),
+          });
+          break;
+        } catch {}
+      }
+    }
 
     return true;
   } catch (err) {
-    console.error('Failed to save album:', err);
+    console.error('Failed to save gallery album:', err);
     return false;
   }
 }
 
 /**
- * Updates an album's name, description, cover image, or imageIds.
+ * Updates an album's name, description, or cover image.
  */
 export async function updateGalleryAlbum(id: string, updates: Partial<GalleryAlbum>): Promise<boolean> {
   try {
@@ -524,13 +611,12 @@ export async function updateGalleryAlbum(id: string, updates: Partial<GalleryAlb
       const getReq = store.get(id);
 
       getReq.onsuccess = () => {
-        const album: GalleryAlbum | undefined = getReq.result;
-        if (!album) {
+        const item: GalleryAlbum | undefined = getReq.result;
+        if (!item) {
           resolve(false);
           return;
         }
-
-        const updated = { ...album, ...updates };
+        const updated = { ...item, ...updates };
         const putReq = store.put(updated);
         putReq.onsuccess = () => resolve(true);
         putReq.onerror = () => reject(putReq.error);
@@ -540,17 +626,29 @@ export async function updateGalleryAlbum(id: string, updates: Partial<GalleryAlb
     });
 
     const currentAlbums = await loadGalleryAlbums();
-    syncAlbumsToServer(currentAlbums);
+    if (typeof window !== 'undefined') {
+      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+      for (const url of endpoints) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'save_albums', albums: currentAlbums }),
+          });
+          break;
+        } catch {}
+      }
+    }
 
     return true;
   } catch (err) {
-    console.error('Failed to update album:', err);
+    console.error('Failed to update gallery album:', err);
     return false;
   }
 }
 
 /**
- * Deletes an album.
+ * Deletes an album (photos inside it remain in the gallery).
  */
 export async function deleteGalleryAlbum(id: string): Promise<boolean> {
   try {
@@ -558,28 +656,40 @@ export async function deleteGalleryAlbum(id: string): Promise<boolean> {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
       const store = tx.objectStore(ALBUM_STORE_NAME);
-      const req = store.delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      store.delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
 
     const currentAlbums = await loadGalleryAlbums();
-    syncAlbumsToServer(currentAlbums);
+    if (typeof window !== 'undefined') {
+      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+      for (const url of endpoints) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'save_albums', albums: currentAlbums }),
+          });
+          break;
+        } catch {}
+      }
+    }
 
     return true;
   } catch (err) {
-    console.error('Failed to delete album:', err);
+    console.error('Failed to delete gallery album:', err);
     return false;
   }
 }
 
 /**
- * Adds one or more images to an album.
+ * Adds multiple image IDs to an album.
  */
 export async function addImagesToAlbum(albumId: string, imageIds: string[]): Promise<boolean> {
   try {
     const db = await openGalleryDB();
-    await new Promise<boolean>((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => {
       const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
       const store = tx.objectStore(ALBUM_STORE_NAME);
       const getReq = store.get(albumId);
@@ -591,9 +701,9 @@ export async function addImagesToAlbum(albumId: string, imageIds: string[]): Pro
           return;
         }
 
-        const currentSet = new Set(album.imageIds);
-        imageIds.forEach((id) => currentSet.add(id));
-        album.imageIds = Array.from(currentSet);
+        const existingSet = new Set(album.imageIds);
+        imageIds.forEach((id) => existingSet.add(id));
+        album.imageIds = Array.from(existingSet);
 
         if (!album.coverImageId && album.imageIds.length > 0) {
           album.coverImageId = album.imageIds[0];
@@ -606,11 +716,6 @@ export async function addImagesToAlbum(albumId: string, imageIds: string[]): Pro
 
       getReq.onerror = () => reject(getReq.error);
     });
-
-    const currentAlbums = await loadGalleryAlbums();
-    syncAlbumsToServer(currentAlbums);
-
-    return true;
   } catch (err) {
     console.error('Failed to add images to album:', err);
     return false;
@@ -618,12 +723,12 @@ export async function addImagesToAlbum(albumId: string, imageIds: string[]): Pro
 }
 
 /**
- * Removes one or more images from an album without deleting them from the Gallery.
+ * Removes multiple image IDs from an album (photos remain in main gallery).
  */
 export async function removeImagesFromAlbum(albumId: string, imageIds: string[]): Promise<boolean> {
   try {
     const db = await openGalleryDB();
-    await new Promise<boolean>((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => {
       const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
       const store = tx.objectStore(ALBUM_STORE_NAME);
       const getReq = store.get(albumId);
@@ -635,8 +740,10 @@ export async function removeImagesFromAlbum(albumId: string, imageIds: string[])
           return;
         }
 
-        album.imageIds = album.imageIds.filter((id) => !imageIds.includes(id));
-        if (album.coverImageId && imageIds.includes(album.coverImageId)) {
+        const removeSet = new Set(imageIds);
+        album.imageIds = album.imageIds.filter((id) => !removeSet.has(id));
+
+        if (album.coverImageId && removeSet.has(album.coverImageId)) {
           album.coverImageId = album.imageIds[0] || undefined;
         }
 
@@ -647,11 +754,6 @@ export async function removeImagesFromAlbum(albumId: string, imageIds: string[])
 
       getReq.onerror = () => reject(getReq.error);
     });
-
-    const currentAlbums = await loadGalleryAlbums();
-    syncAlbumsToServer(currentAlbums);
-
-    return true;
   } catch (err) {
     console.error('Failed to remove images from album:', err);
     return false;
@@ -659,41 +761,20 @@ export async function removeImagesFromAlbum(albumId: string, imageIds: string[])
 }
 
 /**
- * Moves images from one album to another album.
+ * Moves images from one album to another.
  */
 export async function moveImagesBetweenAlbums(
-  fromAlbumId: string,
-  toAlbumId: string,
+  sourceAlbumId: string,
+  targetAlbumId: string,
   imageIds: string[]
 ): Promise<boolean> {
-  try {
-    await removeImagesFromAlbum(fromAlbumId, imageIds);
-    await addImagesToAlbum(toAlbumId, imageIds);
-    return true;
-  } catch (err) {
-    console.error('Failed to move images between albums:', err);
-    return false;
-  }
-}
-
-async function syncAlbumsToServer(albums: GalleryAlbum[]): Promise<void> {
-  if (typeof window === 'undefined') return;
-  const endpoints = [`${import.meta.env.BASE_URL}api/gallery/albums`, '/api/gallery/albums'];
-  for (const url of endpoints) {
-    try {
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save_albums', albums }),
-      });
-      break;
-    } catch {}
-  }
+  const removed = await removeImagesFromAlbum(sourceAlbumId, imageIds);
+  const added = await addImagesToAlbum(targetAlbumId, imageIds);
+  return removed && added;
 }
 
 /**
- * Reads an image file into dataUrl while preserving 100% of the original uncompressed file.
- * Never downscales, compresses, filters, or alters the original bytes.
+ * Helper to process and preserve exact original image bytes via FileReader.
  */
 export function processAndOptimizeImageFile(
   file: File
@@ -708,7 +789,6 @@ export function processAndOptimizeImageFile(
         return;
       }
 
-      // Read natural dimensions purely for display metadata without modifying the image
       const img = new Image();
       img.onload = () => {
         resolve({
@@ -733,7 +813,7 @@ export function processAndOptimizeImageFile(
       img.src = result;
     };
 
-    reader.onerror = () => reject(new Error('Error reading image file'));
+    reader.onerror = () => reject(new Error('FileReader error reading selected image'));
     reader.readAsDataURL(file);
   });
 }

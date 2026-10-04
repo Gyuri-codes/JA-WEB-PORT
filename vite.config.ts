@@ -265,13 +265,14 @@ function gallerySaverPlugin(): Plugin {
         const galleryAssetsDir = path.resolve(__dirname, 'public/assets/gallery');
         const distGalleryAssetsDir = path.resolve(__dirname, 'dist/assets/gallery');
 
-        const readGalleryData = async (): Promise<{ images: any[]; albums: any[] }> => {
+        const readGalleryData = async (): Promise<{ images: any[]; albums: any[]; deletedIds: string[] }> => {
           try {
             const raw = await fs.readFile(jsonPath, 'utf-8');
             const parsed = JSON.parse(raw);
             return {
               images: Array.isArray(parsed.images) ? parsed.images : [],
               albums: Array.isArray(parsed.albums) ? parsed.albums : [],
+              deletedIds: Array.isArray(parsed.deletedIds) ? parsed.deletedIds : [],
             };
           } catch {
             try {
@@ -280,14 +281,15 @@ function gallerySaverPlugin(): Plugin {
               return {
                 images: Array.isArray(parsed.images) ? parsed.images : [],
                 albums: Array.isArray(parsed.albums) ? parsed.albums : [],
+                deletedIds: Array.isArray(parsed.deletedIds) ? parsed.deletedIds : [],
               };
             } catch {
-              return { images: [], albums: [] };
+              return { images: [], albums: [], deletedIds: [] };
             }
           }
         };
 
-        const writeGalleryData = async (data: { images: any[]; albums: any[] }) => {
+        const writeGalleryData = async (data: { images: any[]; albums: any[]; deletedIds?: string[] }) => {
           const str = JSON.stringify(data, null, 2);
           await fs.mkdir(path.dirname(jsonPath), { recursive: true });
           await fs.mkdir(path.dirname(publicJsonPath), { recursive: true });
@@ -353,6 +355,11 @@ function gallerySaverPlugin(): Plugin {
               } catch {}
 
               const savedImages: any[] = [];
+
+              const incomingIds = incomingImages.map((img: any) => img.id).filter(Boolean);
+              if (currentData.deletedIds) {
+                currentData.deletedIds = currentData.deletedIds.filter((dId: string) => !incomingIds.includes(dId));
+              }
 
               for (const img of incomingImages) {
                 const dataUrl = img.dataUrl;
@@ -479,6 +486,7 @@ function gallerySaverPlugin(): Plugin {
               const currentData = await readGalleryData();
               const idSet = new Set(ids);
               currentData.images = currentData.images.filter((img: any) => !idSet.has(img.id));
+              currentData.deletedIds = Array.from(new Set([...(currentData.deletedIds || []), ...ids]));
 
               currentData.albums.forEach((album: any) => {
                 album.imageIds = album.imageIds.filter((imgId: string) => !idSet.has(imgId));
@@ -490,10 +498,13 @@ function gallerySaverPlugin(): Plugin {
               await writeGalleryData(currentData);
 
               for (const id of ids) {
+                const cleanId = id.replace(/^gallery_/, '');
+                const matches = (f: string) => f.startsWith(`${id}.`) || f.startsWith(`${cleanId}.`);
+
                 try {
                   const files = await fs.readdir(uploadDir);
                   for (const f of files) {
-                    if (f.startsWith(`${id}.`)) {
+                    if (matches(f)) {
                       await fs.unlink(path.resolve(uploadDir, f));
                     }
                   }
@@ -501,7 +512,7 @@ function gallerySaverPlugin(): Plugin {
                 try {
                   const assetFiles = await fs.readdir(galleryAssetsDir);
                   for (const f of assetFiles) {
-                    if (f.startsWith(`${id}.`)) {
+                    if (matches(f)) {
                       await fs.unlink(path.resolve(galleryAssetsDir, f));
                     }
                   }
@@ -509,7 +520,7 @@ function gallerySaverPlugin(): Plugin {
                 try {
                   const distFiles = await fs.readdir(distUploadDir);
                   for (const f of distFiles) {
-                    if (f.startsWith(`${id}.`)) {
+                    if (matches(f)) {
                       await fs.unlink(path.resolve(distUploadDir, f));
                     }
                   }
@@ -517,7 +528,7 @@ function gallerySaverPlugin(): Plugin {
                 try {
                   const distAssetFiles = await fs.readdir(distGalleryAssetsDir);
                   for (const f of distAssetFiles) {
-                    if (f.startsWith(`${id}.`)) {
+                    if (matches(f)) {
                       await fs.unlink(path.resolve(distGalleryAssetsDir, f));
                     }
                   }

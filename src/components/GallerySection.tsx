@@ -36,7 +36,9 @@ import {
   removeImagesFromAlbum,
   moveImagesBetweenAlbums,
   processAndOptimizeImageFile,
-  resolveImageUrl
+  resolveImageUrl,
+  getDeletedImageIds,
+  recordDeletedImageIds
 } from '../utils/galleryStorage';
 import {
   getCertificationsAsGalleryImages,
@@ -160,18 +162,33 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
       setCertImages(getCertificationsAsGalleryImages());
     };
 
+    const handleGalleryUpdate = async () => {
+      const [refreshedImages, refreshedAlbums] = await Promise.all([
+        loadGalleryImages(),
+        loadGalleryAlbums(),
+      ]);
+      if (isMounted) {
+        setImages(refreshedImages);
+        setAlbums(refreshedAlbums);
+      }
+    };
+
     window.addEventListener(CERT_UPDATE_EVENT, handleCertUpdate);
+    window.addEventListener('ja_gallery_images_updated', handleGalleryUpdate);
 
     return () => {
       isMounted = false;
       window.removeEventListener(CERT_UPDATE_EVENT, handleCertUpdate);
+      window.removeEventListener('ja_gallery_images_updated', handleGalleryUpdate);
     };
   }, []);
 
-  // Combined images list: includes all permanent certifications and user gallery uploads
+  // Combined images list: includes all permanent certifications and user gallery uploads, filtering out deleted IDs
   const allImages = useMemo(() => {
+    const deletedSet = getDeletedImageIds();
     const certMap = new Map(certImages.map((c) => [c.id, c]));
-    return [...certImages, ...images.filter((img) => !certMap.has(img.id))];
+    const merged = [...certImages, ...images.filter((img) => !certMap.has(img.id))];
+    return merged.filter((img) => !deletedSet.has(img.id));
   }, [certImages, images]);
 
   // Combined albums: includes automatic "National Certifications" album
@@ -443,19 +460,21 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
   const handleDeleteImage = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (window.confirm('Delete this photo from your gallery?')) {
+      recordDeletedImageIds([id]);
       if (id.startsWith('cert_')) {
         const certId = id.replace(/^cert_/, '');
         await removeCertificationImage(certId);
-        setCertImages(getCertificationsAsGalleryImages());
+        recordDeletedImageIds([id, `cert_${certId}`]);
+        setCertImages((prev) => prev.filter((c) => c.id !== id && c.id !== `cert_${certId}`));
       } else {
         await deleteGalleryImage(id);
-        const [refreshedImages, refreshedAlbums] = await Promise.all([
-          loadGalleryImages(),
-          loadGalleryAlbums()
-        ]);
-        setImages(refreshedImages);
-        setAlbums(refreshedAlbums);
       }
+      const [refreshedImages, refreshedAlbums] = await Promise.all([
+        loadGalleryImages(),
+        loadGalleryAlbums()
+      ]);
+      setImages(refreshedImages);
+      setAlbums(refreshedAlbums);
       if (activeLightboxIndex !== null) {
         setActiveLightboxIndex(null);
       }
@@ -468,38 +487,45 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     if (selectedIds.size === 0) return;
     if (window.confirm(`Delete ${selectedIds.size} selected photo(s) from your gallery?`)) {
       const idsToDelete = Array.from<string>(selectedIds);
+      recordDeletedImageIds(idsToDelete);
+
       const certIds = idsToDelete.filter((id) => id.startsWith('cert_')).map((id) => id.replace(/^cert_/, ''));
       const galleryIds = idsToDelete.filter((id) => !id.startsWith('cert_'));
 
       for (const cId of certIds) {
         await removeCertificationImage(cId);
+        recordDeletedImageIds([`cert_${cId}`]);
       }
       if (certIds.length > 0) {
-        setCertImages(getCertificationsAsGalleryImages());
+        setCertImages((prev) => prev.filter((c) => !selectedIds.has(c.id)));
       }
 
       if (galleryIds.length > 0) {
         await deleteMultipleGalleryImages(galleryIds);
-        const [refreshedImages, refreshedAlbums] = await Promise.all([
-          loadGalleryImages(),
-          loadGalleryAlbums()
-        ]);
-        setImages(refreshedImages);
-        setAlbums(refreshedAlbums);
       }
+
+      const [refreshedImages, refreshedAlbums] = await Promise.all([
+        loadGalleryImages(),
+        loadGalleryAlbums()
+      ]);
+      setImages(refreshedImages);
+      setAlbums(refreshedAlbums);
 
       setSelectedIds(new Set());
       setIsSelectMode(false);
-      showToast(`Deleted ${selectedIds.size} photo(s).`, 'info');
+      showToast(`Deleted ${idsToDelete.length} photo(s).`, 'info');
     }
   };
 
   // Clear all images in gallery
   const handleClearAll = async () => {
-    if (images.length === 0) return;
+    if (allImages.length === 0) return;
     if (window.confirm('Delete all photos from the gallery? This cannot be undone.')) {
+      const allIds = allImages.map((img) => img.id);
+      recordDeletedImageIds(allIds);
       await clearAllGalleryImages();
       setImages([]);
+      setCertImages([]);
       const refreshedAlbums = await loadGalleryAlbums();
       setAlbums(refreshedAlbums);
       setSelectedIds(new Set());

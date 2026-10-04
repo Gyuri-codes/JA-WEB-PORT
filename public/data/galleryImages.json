@@ -1,18 +1,7 @@
 {
-  "images": [
-    {
-      "id": "gallery_gOcJH",
-      "imageUrl": "/JA-WEB-PORT/assets/gallery/gOcJH.jpg",
-      "dataUrl": "/JA-WEB-PORT/assets/gallery/gOcJH.jpg",
-      "title": "Culinary & Hospitality Showcase",
-      "caption": "Professional hospitality event preparation and culinary craft.",
-      "category": "",
-      "albumIds": [],
-      "uploadedAt": 1706000000000,
-      "sizeBytes": 29554,
-      "width": 540,
-      "height": 960
-    }
-  ],
-  "albums": []
+  "images": [],
+  "albums": [],
+  "deletedIds": [
+    "gallery_gOcJH"
+  ]
 }
