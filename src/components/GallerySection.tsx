@@ -38,14 +38,10 @@ import {
   processAndOptimizeImageFile,
   resolveImageUrl,
   getDeletedImageIds,
-  recordDeletedImageIds
+  recordDeletedImageIds,
+  getStoredGalleryImagesSync,
+  getStoredGalleryAlbumsSync
 } from '../utils/galleryStorage';
-import {
-  getCertificationsAsGalleryImages,
-  fetchStoredCertifications,
-  CERT_UPDATE_EVENT,
-  removeCertificationImage,
-} from '../utils/certificationStorage';
 
 interface GallerySectionProps {
   currentTheme: ThemeId;
@@ -63,17 +59,12 @@ const REMOVED_CATEGORIES = new Set([
 export function GallerySection({ currentTheme }: GallerySectionProps) {
   const themeConfig = THEME_CONFIGS[currentTheme];
 
-  // Gallery state - strictly initialized to empty, completely isolated
-  const [images, setImages] = useState<GalleryImage[]>([]);
-  const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
+  // Gallery state - initialized synchronously from bundled permanent data + cache
+  const [images, setImages] = useState<GalleryImage[]>(() => getStoredGalleryImagesSync());
+  const [albums, setAlbums] = useState<GalleryAlbum[]>(() => getStoredGalleryAlbumsSync());
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
-
-  // Stored certification images synced with permanent website data
-  const [certImages, setCertImages] = useState<GalleryImage[]>(() => {
-    return getCertificationsAsGalleryImages();
-  });
 
   // View state: 'photos' or 'albums'
   const [activeTab, setActiveTab] = useState<'photos' | 'albums'>('photos');
@@ -151,17 +142,6 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     }
     fetchData();
 
-    // Fetch and sync permanent certification images
-    fetchStoredCertifications().then(() => {
-      if (isMounted) {
-        setCertImages(getCertificationsAsGalleryImages());
-      }
-    });
-
-    const handleCertUpdate = () => {
-      setCertImages(getCertificationsAsGalleryImages());
-    };
-
     const handleGalleryUpdate = async () => {
       const [refreshedImages, refreshedAlbums] = await Promise.all([
         loadGalleryImages(),
@@ -173,45 +153,24 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
       }
     };
 
-    window.addEventListener(CERT_UPDATE_EVENT, handleCertUpdate);
     window.addEventListener('ja_gallery_images_updated', handleGalleryUpdate);
 
     return () => {
       isMounted = false;
-      window.removeEventListener(CERT_UPDATE_EVENT, handleCertUpdate);
       window.removeEventListener('ja_gallery_images_updated', handleGalleryUpdate);
     };
   }, []);
 
-  // Combined images list: includes all permanent certifications and user gallery uploads, filtering out deleted IDs
+  // Gallery images list: user gallery uploads, filtering out deleted IDs
   const allImages = useMemo(() => {
     const deletedSet = getDeletedImageIds();
-    const certMap = new Map(certImages.map((c) => [c.id, c]));
-    const merged = [...certImages, ...images.filter((img) => !certMap.has(img.id))];
-    return merged.filter((img) => !deletedSet.has(img.id));
-  }, [certImages, images]);
+    return images.filter((img) => !deletedSet.has(img.id));
+  }, [images]);
 
-  // Combined albums: includes automatic "National Certifications" album
+  // Gallery albums
   const displayAlbums = useMemo(() => {
-    const list = [...albums];
-    if (certImages.length > 0) {
-      const existingIdx = list.findIndex((a) => a.id === 'album-national-certifications');
-      const certAlbum: GalleryAlbum = {
-        id: 'album-national-certifications',
-        name: 'National Certifications',
-        description: 'TESDA & Asian College accredited qualifications verifying technical hospitality & culinary mastery.',
-        imageIds: certImages.map((c) => c.id),
-        createdAt: 1706000000000,
-        coverImageId: certImages[0]?.id,
-      };
-      if (existingIdx >= 0) {
-        list[existingIdx] = certAlbum;
-      } else {
-        list.unshift(certAlbum);
-      }
-    }
-    return list;
-  }, [albums, certImages]);
+    return albums;
+  }, [albums]);
 
   // Sync activeAlbum with updated albums state
   useEffect(() => {
@@ -459,79 +418,51 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
   // Delete single photo from main gallery
   const handleDeleteImage = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (window.confirm('Delete this photo from your gallery?')) {
-      recordDeletedImageIds([id]);
-      if (id.startsWith('cert_')) {
-        const certId = id.replace(/^cert_/, '');
-        await removeCertificationImage(certId);
-        recordDeletedImageIds([id, `cert_${certId}`]);
-        setCertImages((prev) => prev.filter((c) => c.id !== id && c.id !== `cert_${certId}`));
-      } else {
-        await deleteGalleryImage(id);
-      }
-      const [refreshedImages, refreshedAlbums] = await Promise.all([
-        loadGalleryImages(),
-        loadGalleryAlbums()
-      ]);
-      setImages(refreshedImages);
-      setAlbums(refreshedAlbums);
-      if (activeLightboxIndex !== null) {
-        setActiveLightboxIndex(null);
-      }
-      showToast('Photo deleted from gallery.', 'info');
+    recordDeletedImageIds([id]);
+    await deleteGalleryImage(id);
+    const [refreshedImages, refreshedAlbums] = await Promise.all([
+      loadGalleryImages(),
+      loadGalleryAlbums()
+    ]);
+    setImages(refreshedImages);
+    setAlbums(refreshedAlbums);
+    if (activeLightboxIndex !== null) {
+      setActiveLightboxIndex(null);
     }
+    showToast('Photo permanently deleted from gallery.', 'info');
   };
 
   // Bulk delete selected photos
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (window.confirm(`Delete ${selectedIds.size} selected photo(s) from your gallery?`)) {
-      const idsToDelete = Array.from<string>(selectedIds);
-      recordDeletedImageIds(idsToDelete);
+    const idsToDelete = Array.from<string>(selectedIds);
+    recordDeletedImageIds(idsToDelete);
+    await deleteMultipleGalleryImages(idsToDelete);
 
-      const certIds = idsToDelete.filter((id) => id.startsWith('cert_')).map((id) => id.replace(/^cert_/, ''));
-      const galleryIds = idsToDelete.filter((id) => !id.startsWith('cert_'));
+    const [refreshedImages, refreshedAlbums] = await Promise.all([
+      loadGalleryImages(),
+      loadGalleryAlbums()
+    ]);
+    setImages(refreshedImages);
+    setAlbums(refreshedAlbums);
 
-      for (const cId of certIds) {
-        await removeCertificationImage(cId);
-        recordDeletedImageIds([`cert_${cId}`]);
-      }
-      if (certIds.length > 0) {
-        setCertImages((prev) => prev.filter((c) => !selectedIds.has(c.id)));
-      }
-
-      if (galleryIds.length > 0) {
-        await deleteMultipleGalleryImages(galleryIds);
-      }
-
-      const [refreshedImages, refreshedAlbums] = await Promise.all([
-        loadGalleryImages(),
-        loadGalleryAlbums()
-      ]);
-      setImages(refreshedImages);
-      setAlbums(refreshedAlbums);
-
-      setSelectedIds(new Set());
-      setIsSelectMode(false);
-      showToast(`Deleted ${idsToDelete.length} photo(s).`, 'info');
-    }
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
+    showToast(`Permanently deleted ${idsToDelete.length} photo(s).`, 'info');
   };
 
   // Clear all images in gallery
   const handleClearAll = async () => {
     if (allImages.length === 0) return;
-    if (window.confirm('Delete all photos from the gallery? This cannot be undone.')) {
-      const allIds = allImages.map((img) => img.id);
-      recordDeletedImageIds(allIds);
-      await clearAllGalleryImages();
-      setImages([]);
-      setCertImages([]);
-      const refreshedAlbums = await loadGalleryAlbums();
-      setAlbums(refreshedAlbums);
-      setSelectedIds(new Set());
-      setIsSelectMode(false);
-      showToast('Gallery cleared.', 'info');
-    }
+    const allIds = allImages.map((img) => img.id);
+    recordDeletedImageIds(allIds);
+    await clearAllGalleryImages();
+    setImages([]);
+    const refreshedAlbums = await loadGalleryAlbums();
+    setAlbums(refreshedAlbums);
+    setSelectedIds(new Set());
+    setIsSelectMode(false);
+    showToast('Gallery cleared.', 'info');
   };
 
   // Edit photo info
@@ -1072,26 +1003,24 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
                       {/* Top Action Options for Album */}
-                      {album.id !== 'album-national-certifications' && (
-                        <div className="absolute top-2.5 right-2.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenRenameAlbum(album, e)}
-                            className="p-1.5 bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-white/20 transition-colors"
-                            title="Rename Album"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteAlbum(album.id, album.name, e)}
-                            className="p-1.5 bg-black/80 hover:bg-red-600 text-white border border-white/20 transition-colors"
-                            title="Delete Album (photos remain in gallery)"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="absolute top-2.5 right-2.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenRenameAlbum(album, e)}
+                          className="p-1.5 bg-black/80 hover:bg-[#C5A059] text-white hover:text-black border border-white/20 transition-colors"
+                          title="Rename Album"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteAlbum(album.id, album.name, e)}
+                          className="p-1.5 bg-black/80 hover:bg-red-600 text-white border border-white/20 transition-colors"
+                          title="Delete Album (photos remain in gallery)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
                       {/* Bottom Album Info */}
                       <div className="relative z-10 p-3.5 sm:p-4">

@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import nodeFs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, Plugin } from 'vite';
 
@@ -256,14 +257,15 @@ function gallerySaverPlugin(): Plugin {
   return {
     name: 'gallery-saver',
     configureServer(server) {
+      const jsonPath = path.resolve(__dirname, 'src/data/galleryImages.json');
+      const publicJsonPath = path.resolve(__dirname, 'public/data/galleryImages.json');
+      const distJsonPath = path.resolve(__dirname, 'dist/data/galleryImages.json');
+      const uploadDir = path.resolve(__dirname, 'public/uploads/gallery');
+      const distUploadDir = path.resolve(__dirname, 'dist/uploads/gallery');
+      const galleryAssetsDir = path.resolve(__dirname, 'public/assets/gallery');
+      const distGalleryAssetsDir = path.resolve(__dirname, 'dist/assets/gallery');
+
       const handleGalleryRequest = async (req: any, res: any) => {
-        const jsonPath = path.resolve(__dirname, 'src/data/galleryImages.json');
-        const publicJsonPath = path.resolve(__dirname, 'public/data/galleryImages.json');
-        const distJsonPath = path.resolve(__dirname, 'dist/data/galleryImages.json');
-        const uploadDir = path.resolve(__dirname, 'public/uploads/gallery');
-        const distUploadDir = path.resolve(__dirname, 'dist/uploads/gallery');
-        const galleryAssetsDir = path.resolve(__dirname, 'public/assets/gallery');
-        const distGalleryAssetsDir = path.resolve(__dirname, 'dist/assets/gallery');
 
         const readGalleryData = async (): Promise<{ images: any[]; albums: any[]; deletedIds: string[] }> => {
           try {
@@ -559,6 +561,42 @@ function gallerySaverPlugin(): Plugin {
           url === '/JA-WEB-PORT/api/gallery/albums'
         ) {
           handleGalleryRequest(req, res);
+        } else if (
+          url &&
+          (url.startsWith('/JA-WEB-PORT/assets/gallery/') ||
+            url.startsWith('/assets/gallery/') ||
+            url.startsWith('/JA-WEB-PORT/uploads/gallery/') ||
+            url.startsWith('/uploads/gallery/'))
+        ) {
+          const fileName = path.basename(url);
+          const candidates = [
+            path.resolve(galleryAssetsDir, fileName),
+            path.resolve(uploadDir, fileName),
+          ];
+          let foundPath = '';
+          for (const cand of candidates) {
+            if (nodeFs.existsSync(cand)) {
+              foundPath = cand;
+              break;
+            }
+          }
+          if (foundPath) {
+            const ext = path.extname(foundPath).toLowerCase();
+            const mimeMap: Record<string, string> = {
+              '.jpg': 'image/jpeg',
+              '.jpeg': 'image/jpeg',
+              '.png': 'image/png',
+              '.webp': 'image/webp',
+              '.gif': 'image/gif',
+            };
+            res.writeHead(200, {
+              'Content-Type': mimeMap[ext] || 'application/octet-stream',
+              'Cache-Control': 'public, max-age=31536000',
+            });
+            nodeFs.createReadStream(foundPath).pipe(res);
+            return;
+          }
+          next();
         } else {
           next();
         }

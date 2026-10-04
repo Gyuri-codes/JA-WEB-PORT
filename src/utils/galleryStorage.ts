@@ -132,6 +132,48 @@ function sanitizeGalleryItem(item: GalleryImage): GalleryImage {
 }
 
 /**
+ * Synchronous getter for immediate initial render from bundled data + cache.
+ */
+export function getStoredGalleryImagesSync(): GalleryImage[] {
+  const deletedSet = getDeletedImageIds();
+  const bundledRaw: any[] = Array.isArray((defaultGalleryData as any)?.images)
+    ? (defaultGalleryData as any).images
+    : [];
+  let localFallback: GalleryImage[] = [];
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(PUBLIC_META_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          localFallback = parsed.map(sanitizeGalleryItem);
+        }
+      }
+    } catch {}
+  }
+  const mergedMap = new Map<string, GalleryImage>();
+  bundledRaw.map(sanitizeGalleryItem).forEach((img) => {
+    if (!deletedSet.has(img.id)) mergedMap.set(img.id, img);
+  });
+  localFallback.forEach((img) => {
+    if (!deletedSet.has(img.id)) mergedMap.set(img.id, img);
+  });
+  const list = Array.from(mergedMap.values()).filter((img) => !deletedSet.has(img.id));
+  list.sort((a, b) => b.uploadedAt - a.uploadedAt);
+  return list;
+}
+
+/**
+ * Synchronous getter for albums from bundled data.
+ */
+export function getStoredGalleryAlbumsSync(): GalleryAlbum[] {
+  const bundledRaw: any[] = Array.isArray((defaultGalleryData as any)?.albums)
+    ? (defaultGalleryData as any).albums
+    : [];
+  return bundledRaw;
+}
+
+/**
  * Loads all stored gallery images.
  * Priority order:
  * 1. Permanent repository-hosted images bundled in `galleryImages.json` and served by GitHub Pages
@@ -249,11 +291,12 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
   const finalImages = Array.from(mergedMap.values()).filter((img) => !currentDeleted.has(img.id));
   finalImages.sort((a, b) => b.uploadedAt - a.uploadedAt);
 
-  // Sync back to IndexedDB so local cache is clean
+  // Sync back to IndexedDB so local cache is clean and deleted IDs are purged
   try {
     const db = await openGalleryDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
+    currentDeleted.forEach((dId) => store.delete(dId));
     finalImages.forEach((img) => store.put(img));
   } catch {}
 
@@ -314,11 +357,19 @@ export async function saveMultipleGalleryImages(
       }
     }
 
-    // 3. Update IndexedDB with repository image URLs if returned
+    // 3. Update IndexedDB with repository image URLs if returned, preserving original dataUrl fallback
     if (savedServerImages.length > 0) {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      savedServerImages.forEach((img) => store.put(img));
+      savedServerImages.forEach((img) => {
+        const orig = newImages.find((n) => n.id === img.id);
+        const itemToStore: GalleryImage = {
+          ...img,
+          dataUrl: orig?.dataUrl || img.dataUrl || img.imageUrl,
+          imageUrl: img.imageUrl,
+        };
+        store.put(itemToStore);
+      });
     }
 
     const currentImages = await loadGalleryImages();
@@ -332,6 +383,7 @@ export async function saveMultipleGalleryImages(
         }));
         localStorage.setItem(PUBLIC_META_KEY, JSON.stringify(shallow));
       } catch {}
+      window.dispatchEvent(new CustomEvent('ja_gallery_images_updated'));
     }
 
     return {
