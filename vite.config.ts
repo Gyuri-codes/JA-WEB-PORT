@@ -243,9 +243,290 @@ function certificationsSaverPlugin(): Plugin {
   };
 }
 
+function gallerySaverPlugin(): Plugin {
+  return {
+    name: 'gallery-saver',
+    configureServer(server) {
+      const handleGalleryRequest = async (req: any, res: any) => {
+        const jsonPath = path.resolve(__dirname, 'src/data/galleryImages.json');
+        const publicJsonPath = path.resolve(__dirname, 'public/data/galleryImages.json');
+        const distJsonPath = path.resolve(__dirname, 'dist/data/galleryImages.json');
+        const uploadDir = path.resolve(__dirname, 'public/uploads/gallery');
+        const distUploadDir = path.resolve(__dirname, 'dist/uploads/gallery');
+
+        const readGalleryData = async (): Promise<{ images: any[]; albums: any[] }> => {
+          try {
+            const raw = await fs.readFile(jsonPath, 'utf-8');
+            const parsed = JSON.parse(raw);
+            return {
+              images: Array.isArray(parsed.images) ? parsed.images : [],
+              albums: Array.isArray(parsed.albums) ? parsed.albums : [],
+            };
+          } catch {
+            try {
+              const raw = await fs.readFile(publicJsonPath, 'utf-8');
+              const parsed = JSON.parse(raw);
+              return {
+                images: Array.isArray(parsed.images) ? parsed.images : [],
+                albums: Array.isArray(parsed.albums) ? parsed.albums : [],
+              };
+            } catch {
+              return { images: [], albums: [] };
+            }
+          }
+        };
+
+        const writeGalleryData = async (data: { images: any[]; albums: any[] }) => {
+          const str = JSON.stringify(data, null, 2);
+          await fs.mkdir(path.dirname(jsonPath), { recursive: true });
+          await fs.mkdir(path.dirname(publicJsonPath), { recursive: true });
+          await fs.writeFile(jsonPath, str, 'utf-8');
+          await fs.writeFile(publicJsonPath, str, 'utf-8');
+          try {
+            await fs.mkdir(path.dirname(distJsonPath), { recursive: true });
+            await fs.writeFile(distJsonPath, str, 'utf-8');
+          } catch {}
+        };
+
+        if (req.method === 'GET') {
+          try {
+            const data = await readGalleryData();
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            });
+            res.end(JSON.stringify({ success: true, data }));
+            return;
+          } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to read gallery data' }));
+            return;
+          }
+        }
+
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body);
+              const currentData = await readGalleryData();
+
+              if (payload.action === 'save_albums' && Array.isArray(payload.albums)) {
+                currentData.albums = payload.albums;
+                await writeGalleryData(currentData);
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ success: true, data: currentData }));
+                return;
+              }
+
+              const incomingImages: any[] = Array.isArray(payload.images)
+                ? payload.images
+                : payload.image
+                ? [payload.image]
+                : [];
+
+              if (incomingImages.length === 0) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'No images provided' }));
+                return;
+              }
+
+              await fs.mkdir(uploadDir, { recursive: true });
+              try {
+                await fs.mkdir(distUploadDir, { recursive: true });
+              } catch {}
+
+              const savedImages: any[] = [];
+
+              for (const img of incomingImages) {
+                const dataUrl = img.dataUrl;
+                if (!dataUrl) continue;
+
+                let ext = 'png';
+                let base64Data = dataUrl;
+                const match = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+                if (match) {
+                  ext = match[1] === 'svg+xml' ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
+                  base64Data = match[2];
+                }
+
+                const safeId = (img.id || `gallery_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+                const fileName = `${safeId}.${ext}`;
+                const filePath = path.resolve(uploadDir, fileName);
+                const buf = Buffer.from(base64Data, 'base64');
+                await fs.writeFile(filePath, buf);
+                try {
+                  await fs.writeFile(path.resolve(distUploadDir, fileName), buf);
+                } catch {}
+
+                const repoUrl = `/JA-WEB-PORT/uploads/gallery/${fileName}`;
+
+                const imageItem = {
+                  id: img.id || safeId,
+                  imageUrl: repoUrl,
+                  dataUrl: repoUrl,
+                  title: img.title || 'Untitled Photo',
+                  caption: img.caption || '',
+                  category: img.category || '',
+                  albumIds: Array.isArray(img.albumIds) ? img.albumIds : [],
+                  uploadedAt: img.uploadedAt || Date.now(),
+                  sizeBytes: img.sizeBytes || buf.length,
+                  width: img.width || 1200,
+                  height: img.height || 800,
+                };
+
+                savedImages.push(imageItem);
+
+                const existingIdx = currentData.images.findIndex((i: any) => i.id === imageItem.id);
+                if (existingIdx >= 0) {
+                  currentData.images[existingIdx] = imageItem;
+                } else {
+                  currentData.images.unshift(imageItem);
+                }
+              }
+
+              await writeGalleryData(currentData);
+
+              res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              });
+              res.end(JSON.stringify({ success: true, savedImages, data: currentData }));
+              return;
+            } catch (err) {
+              console.error('Save gallery error:', err);
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Failed to save gallery images' }));
+            }
+          });
+          return;
+        }
+
+        if (req.method === 'PUT') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              const { id, updates } = JSON.parse(body);
+              if (!id || !updates) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing id or updates' }));
+                return;
+              }
+
+              const currentData = await readGalleryData();
+              const idx = currentData.images.findIndex((i: any) => i.id === id);
+              if (idx >= 0) {
+                currentData.images[idx] = { ...currentData.images[idx], ...updates };
+                await writeGalleryData(currentData);
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+              res.end(JSON.stringify({ success: true, data: currentData }));
+              return;
+            } catch (err) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Failed to update image' }));
+            }
+          });
+          return;
+        }
+
+        if (req.method === 'DELETE') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => {
+            body += chunk;
+          });
+          req.on('end', async () => {
+            try {
+              let ids: string[] = [];
+              try {
+                const parsed = JSON.parse(body);
+                ids = Array.isArray(parsed.ids) ? parsed.ids : parsed.id ? [parsed.id] : [];
+              } catch {
+                const url = new URL(req.url, 'http://localhost');
+                const id = url.searchParams.get('id');
+                if (id) ids = [id];
+              }
+
+              if (ids.length === 0) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing ids to delete' }));
+                return;
+              }
+
+              const currentData = await readGalleryData();
+              const idSet = new Set(ids);
+              currentData.images = currentData.images.filter((img: any) => !idSet.has(img.id));
+
+              currentData.albums.forEach((album: any) => {
+                album.imageIds = album.imageIds.filter((imgId: string) => !idSet.has(imgId));
+                if (album.coverImageId && idSet.has(album.coverImageId)) {
+                  album.coverImageId = album.imageIds[0] || undefined;
+                }
+              });
+
+              await writeGalleryData(currentData);
+
+              for (const id of ids) {
+                try {
+                  const files = await fs.readdir(uploadDir);
+                  for (const f of files) {
+                    if (f.startsWith(`${id}.`)) {
+                      await fs.unlink(path.resolve(uploadDir, f));
+                    }
+                  }
+                } catch {}
+                try {
+                  const distFiles = await fs.readdir(distUploadDir);
+                  for (const f of distFiles) {
+                    if (f.startsWith(`${id}.`)) {
+                      await fs.unlink(path.resolve(distUploadDir, f));
+                    }
+                  }
+                } catch {}
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+              res.end(JSON.stringify({ success: true, data: currentData }));
+              return;
+            } catch (err) {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Failed to delete gallery images' }));
+            }
+          });
+          return;
+        }
+
+        res.writeHead(405);
+        res.end();
+      };
+
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0];
+        if (
+          url === '/api/gallery' ||
+          url === '/JA-WEB-PORT/api/gallery' ||
+          url === '/api/gallery/albums' ||
+          url === '/JA-WEB-PORT/api/gallery/albums'
+        ) {
+          handleGalleryRequest(req, res);
+        } else {
+          next();
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/JA-WEB-PORT/',
-  plugins: [react(), tailwindcss(), portraitSaverPlugin(), certificationsSaverPlugin()],
+  plugins: [react(), tailwindcss(), portraitSaverPlugin(), certificationsSaverPlugin(), gallerySaverPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),

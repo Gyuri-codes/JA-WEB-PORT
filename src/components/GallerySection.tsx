@@ -241,7 +241,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
 
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
-        setUploadProgress(`Optimizing ${i + 1} of ${fileArray.length}: ${file.name}`);
+        setUploadProgress(`Processing original ${i + 1} of ${fileArray.length}: ${file.name}`);
 
         try {
           const { dataUrl, width, height, sizeBytes } = await processAndOptimizeImageFile(file);
@@ -268,7 +268,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
       }
 
       if (processedImages.length > 0) {
-        setUploadProgress('Saving to gallery...');
+        setUploadProgress('Saving to gallery repository storage...');
         const result = await saveMultipleGalleryImages(processedImages);
         const refreshed = await loadGalleryImages();
         setImages(refreshed);
@@ -281,7 +281,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
           setAlbums(updatedAlbums);
         }
 
-        showToast(`Successfully uploaded ${result.added} photo(s).`, 'success');
+        showToast(`Successfully added ${result.added} photo(s) to gallery storage.`, 'success');
       }
     } catch (err) {
       console.error('Upload failed:', err);
