@@ -337,6 +337,13 @@ function gallerySaverPlugin(): Plugin {
                 return;
               }
 
+              if (Array.isArray(payload.albums) && payload.albums.length > 0) {
+                const albumMap = new Map();
+                currentData.albums.forEach((a: any) => albumMap.set(a.id, a));
+                payload.albums.forEach((a: any) => albumMap.set(a.id, a));
+                currentData.albums = Array.from(albumMap.values());
+              }
+
               const incomingImages: any[] = Array.isArray(payload.images)
                 ? payload.images
                 : payload.image

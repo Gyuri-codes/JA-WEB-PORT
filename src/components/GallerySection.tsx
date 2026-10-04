@@ -17,7 +17,9 @@ import {
   MoveRight,
   Plus,
   Info,
-  Images
+  Images,
+  RefreshCw,
+  CloudUpload
 } from 'lucide-react';
 import { ThemeId, GalleryImage, GalleryAlbum } from '../types';
 import { THEME_CONFIGS } from '../data/portfolioData';
@@ -40,7 +42,8 @@ import {
   getDeletedImageIds,
   recordDeletedImageIds,
   getStoredGalleryImagesSync,
-  getStoredGalleryAlbumsSync
+  getStoredGalleryAlbumsSync,
+  autoMigrateBrowserImagesToRepository
 } from '../utils/galleryStorage';
 
 interface GallerySectionProps {
@@ -149,6 +152,26 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
           setImages(storedImages);
           setAlbums(storedAlbums);
         }
+
+        // Automatically scan and migrate any uploaded images from browser storage to permanent repository assets
+        autoMigrateBrowserImagesToRepository((migrated, total) => {
+          if (isMounted) {
+            setUploadProgress(`Permanently saving photo ${migrated} of ${total} to repository assets...`);
+          }
+        }).then(async (result) => {
+          if (isMounted && result.migratedCount > 0) {
+            setUploadProgress(null);
+            const [refreshedImages, refreshedAlbums] = await Promise.all([
+              loadGalleryImages(),
+              loadGalleryAlbums()
+            ]);
+            setImages(refreshedImages);
+            setAlbums(refreshedAlbums);
+            showToast(`Permanently saved ${result.migratedCount} gallery photos to repository assets!`, 'success');
+          }
+        }).catch(() => {
+          if (isMounted) setUploadProgress(null);
+        });
       } catch (err) {
         console.error('Failed to load gallery data:', err);
       } finally {
@@ -175,6 +198,33 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
       window.removeEventListener('ja_gallery_images_updated', handleGalleryUpdate);
     };
   }, []);
+
+  const handleSyncBrowserImages = async () => {
+    setIsUploading(true);
+    setUploadProgress('Checking browser storage for photos...');
+    try {
+      const res = await autoMigrateBrowserImagesToRepository((migrated, total) => {
+        setUploadProgress(`Saving photo ${migrated} of ${total} to repository assets...`);
+      });
+      if (res.migratedCount > 0) {
+        const [refreshedImages, refreshedAlbums] = await Promise.all([
+          loadGalleryImages(),
+          loadGalleryAlbums()
+        ]);
+        setImages(refreshedImages);
+        setAlbums(refreshedAlbums);
+        showToast(`Successfully saved ${res.migratedCount} photos to repository assets!`, 'success');
+      } else {
+        showToast('All photos are already permanently saved in your repository.', 'info');
+      }
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+      showToast('Sync check completed.', 'info');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(null);
+    }
+  };
 
   // Gallery images list: user gallery uploads, filtering out deleted IDs
   const allImages = useMemo(() => {
@@ -727,6 +777,17 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Photos</span>
+              </button>
+
+              {/* Sync uploaded photos to permanent repository assets */}
+              <button
+                type="button"
+                onClick={handleSyncBrowserImages}
+                disabled={isUploading}
+                className="p-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#333333] hover:border-[#C5A059] text-[#C5A059] hover:text-white transition-colors cursor-pointer disabled:opacity-50"
+                title="Sync uploaded photos to permanent repository assets"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isUploading ? 'animate-spin' : ''}`} />
               </button>
 
               {/* Select Mode toggle (available when images exist in current view) */}

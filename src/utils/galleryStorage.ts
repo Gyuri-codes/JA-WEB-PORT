@@ -76,13 +76,20 @@ export function resolveImageUrl(url?: string | null): string {
   const rawBase = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/';
   const cleanBase = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
+  let pathWithoutBase = url;
   if (url.startsWith('/JA-WEB-PORT/')) {
-    return `${cleanBase}${url.slice('/JA-WEB-PORT'.length)}`;
+    pathWithoutBase = url.slice('/JA-WEB-PORT'.length);
+  } else if (url.startsWith('JA-WEB-PORT/')) {
+    pathWithoutBase = '/' + url.slice('JA-WEB-PORT/'.length);
   }
-  if (url.startsWith('/')) {
-    return `${cleanBase}${url}`;
+
+  if (!pathWithoutBase.startsWith('/')) {
+    pathWithoutBase = '/' + pathWithoutBase;
   }
-  return `${cleanBase}/${url}`;
+
+  // Safe encoding for GitHub Pages URLs with spaces or special characters
+  const encodedPath = encodeURI(pathWithoutBase);
+  return `${cleanBase}${encodedPath}`;
 }
 
 function openGalleryDB(): Promise<IDBDatabase> {
@@ -313,10 +320,11 @@ export async function saveGalleryImage(image: GalleryImage): Promise<{ success: 
 
 /**
  * Saves multiple gallery images permanently.
- * Persists to IndexedDB and posts to server API to save physical files in repository (public/assets/gallery/).
+ * Persists to IndexedDB and posts to server API in safe chunks to save physical files in repository (public/assets/gallery/).
  */
 export async function saveMultipleGalleryImages(
-  newImages: GalleryImage[]
+  newImages: GalleryImage[],
+  onProgress?: (saved: number, total: number) => void
 ): Promise<{ added: number; total: number }> {
   try {
     const newIds = newImages.map((img) => img.id);
@@ -333,26 +341,34 @@ export async function saveMultipleGalleryImages(
       tx.onerror = () => reject(tx.error);
     });
 
-    // 2. Post to server endpoint to write physical repository files
-    let savedServerImages: GalleryImage[] = [];
+    // 2. Post to server endpoint in safe chunks of 2 to avoid payload limits
+    const CHUNK_SIZE = 2;
+    const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+    const savedServerImages: GalleryImage[] = [];
+
     if (typeof window !== 'undefined') {
-      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
-      for (const url of endpoints) {
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ images: newImages }),
-          });
-          if (res.ok) {
-            const json = await res.json();
-            if (Array.isArray(json.savedImages)) {
-              savedServerImages = json.savedImages.map(sanitizeGalleryItem);
-              break;
+      for (let i = 0; i < newImages.length; i += CHUNK_SIZE) {
+        const chunk = newImages.slice(i, i + CHUNK_SIZE);
+        for (const url of endpoints) {
+          try {
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ images: chunk }),
+            });
+            if (res.ok) {
+              const json = await res.json();
+              if (Array.isArray(json.savedImages)) {
+                savedServerImages.push(...json.savedImages.map(sanitizeGalleryItem));
+                if (onProgress) {
+                  onProgress(savedServerImages.length, newImages.length);
+                }
+                break;
+              }
             }
+          } catch {
+            // try next endpoint or fallback to local
           }
-        } catch {
-          // ignore or fallback to local
         }
       }
     }
@@ -387,12 +403,192 @@ export async function saveMultipleGalleryImages(
     }
 
     return {
-      added: newImages.length,
+      added: savedServerImages.length > 0 ? savedServerImages.length : newImages.length,
       total: currentImages.length,
     };
   } catch (err) {
     console.error('Failed to save multiple gallery images:', err);
     return { added: 0, total: 0 };
+  }
+}
+
+/**
+ * Scans all client-side browser storage (IndexedDB databases and localStorage) for uploaded Gallery images
+ * that currently only exist in browser storage as base64 data, and automatically transmits them to the server
+ * so they are permanently saved as physical repository files in /assets/gallery/ and cataloged in galleryImages.json.
+ */
+export async function autoMigrateBrowserImagesToRepository(
+  onProgress?: (migratedCount: number, total: number) => void
+): Promise<{ migratedCount: number; message: string }> {
+  if (typeof window === 'undefined') {
+    return { migratedCount: 0, message: 'Server environment' };
+  }
+
+  try {
+    const unmigratedImages: GalleryImage[] = [];
+    const unmigratedAlbums: GalleryAlbum[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Fetch current repository images to know what's already saved permanently on the server
+    const currentRemote = await loadGalleryImages();
+    const serverSavedIds = new Set(
+      currentRemote
+        .filter((img) => img.imageUrl && !img.imageUrl.startsWith('data:') && !img.imageUrl.startsWith('blob:'))
+        .map((img) => img.id)
+    );
+
+    // 2. Check all possible IndexedDB databases
+    const dbNames = ['JA_GALLERY_DB_V2', 'JA_GALLERY_DB_V1', 'JA_GALLERY_DB', 'gallery_db'];
+    for (const dbName of dbNames) {
+      try {
+        await new Promise<void>((resolve) => {
+          const req = window.indexedDB.open(dbName);
+          req.onsuccess = () => {
+            const db = req.result;
+            const storeNames = Array.from(db.objectStoreNames);
+
+            const itemStores = storeNames.filter((s) => s.includes('item') || s.includes('image') || s.includes('photo'));
+            const albumStores = storeNames.filter((s) => s.includes('album'));
+
+            let pending = itemStores.length + albumStores.length;
+            if (pending === 0) {
+              db.close();
+              resolve();
+              return;
+            }
+
+            itemStores.forEach((sName) => {
+              try {
+                const tx = db.transaction(sName, 'readonly');
+                const store = tx.objectStore(sName);
+                const getReq = store.getAll();
+                getReq.onsuccess = () => {
+                  const items: any[] = getReq.result || [];
+                  items.forEach((item) => {
+                    if (item && item.id && !seenIds.has(item.id)) {
+                      const data = item.dataUrl || item.imageUrl;
+                      if (data && typeof data === 'string' && data.startsWith('data:image/')) {
+                        if (!serverSavedIds.has(item.id)) {
+                          seenIds.add(item.id);
+                          unmigratedImages.push(item);
+                        }
+                      }
+                    }
+                  });
+                  pending--;
+                  if (pending === 0) {
+                    db.close();
+                    resolve();
+                  }
+                };
+                getReq.onerror = () => {
+                  pending--;
+                  if (pending === 0) {
+                    db.close();
+                    resolve();
+                  }
+                };
+              } catch {
+                pending--;
+                if (pending === 0) {
+                  db.close();
+                  resolve();
+                }
+              }
+            });
+
+            albumStores.forEach((sName) => {
+              try {
+                const tx = db.transaction(sName, 'readonly');
+                const store = tx.objectStore(sName);
+                const getReq = store.getAll();
+                getReq.onsuccess = () => {
+                  const albums: any[] = getReq.result || [];
+                  albums.forEach((album) => {
+                    if (album && album.id) {
+                      unmigratedAlbums.push(album);
+                    }
+                  });
+                  pending--;
+                  if (pending === 0) {
+                    db.close();
+                    resolve();
+                  }
+                };
+                getReq.onerror = () => {
+                  pending--;
+                  if (pending === 0) {
+                    db.close();
+                    resolve();
+                  }
+                };
+              } catch {
+                pending--;
+                if (pending === 0) {
+                  db.close();
+                  resolve();
+                }
+              }
+            });
+          };
+          req.onerror = () => resolve();
+        });
+      } catch {}
+    }
+
+    // 3. Check localStorage
+    const localKeys = ['ja_gallery_public_meta_v2', 'ja_gallery_images', 'gallery_items'];
+    localKeys.forEach((key) => {
+      try {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: any) => {
+              if (item && item.id && !seenIds.has(item.id)) {
+                const data = item.dataUrl || item.imageUrl;
+                if (data && typeof data === 'string' && data.startsWith('data:image/')) {
+                  if (!serverSavedIds.has(item.id)) {
+                    seenIds.add(item.id);
+                    unmigratedImages.push(item);
+                  }
+                }
+              }
+            });
+          }
+        }
+      } catch {}
+    });
+
+    if (unmigratedImages.length === 0) {
+      return { migratedCount: 0, message: 'All gallery images are already permanently saved in the repository.' };
+    }
+
+    // 4. Save unmigrated images to repository via chunked saveMultipleGalleryImages
+    const result = await saveMultipleGalleryImages(unmigratedImages, onProgress);
+
+    // 5. If there are albums in browser storage, save them to the server too
+    if (unmigratedAlbums.length > 0) {
+      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+      for (const url of endpoints) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'save_albums', albums: unmigratedAlbums }),
+          });
+          break;
+        } catch {}
+      }
+    }
+
+    return {
+      migratedCount: result.added,
+      message: `Successfully migrated ${result.added} photos to permanent repository assets.`,
+    };
+  } catch (err) {
+    console.error('Auto-migration error:', err);
+    return { migratedCount: 0, message: 'Failed to migrate gallery images.' };
   }
 }
 
