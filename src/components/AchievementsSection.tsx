@@ -100,7 +100,7 @@ export function AchievementsSection({
             className="text-3xl sm:text-5xl font-serif italic font-light text-white tracking-tight"
             style={{ fontFamily: themeConfig.fontHeadline }}
           >
-            Achievements & Honors
+            Achievements
           </h2>
           <p className="mt-4 text-sm sm:text-base text-[#999999] max-w-2xl mx-auto font-light leading-relaxed">
             Tangible distinctions earned across accredited hospitality qualification boards, industry internships, and experimental digital projects.
