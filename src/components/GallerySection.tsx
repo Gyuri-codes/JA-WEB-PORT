@@ -112,6 +112,21 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
 
   // Single file input reference (The ONE and ONLY upload button in the gallery)
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addPhotosScrollRef = useRef<HTMLDivElement>(null);
+
+  // Prevent background scroll and reset scroll position when "Add Photos to this Album" modal opens
+  useEffect(() => {
+    if (addPhotosToCurrentAlbumModal) {
+      if (addPhotosScrollRef.current) {
+        addPhotosScrollRef.current.scrollTop = 0;
+      }
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [addPhotosToCurrentAlbumModal]);
 
   const showToast = (message: string, type: 'success' | 'warning' | 'info' = 'info') => {
     setNotification({ message, type });
@@ -1674,22 +1689,23 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
         {/* ADD PHOTOS TO CURRENT ALBUM MODAL */}
         {addPhotosToCurrentAlbumModal && activeAlbum && (
           <div
-            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2.5 sm:p-4 md:p-6 overflow-hidden overscroll-none"
             onClick={() => {
               setAddPhotosToCurrentAlbumModal(false);
               setPhotosToAddToAlbum(new Set());
             }}
           >
             <div
-              className="bg-[#141414] border border-[#C5A059] max-w-2xl w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]"
+              className="bg-[#141414] border border-[#C5A059] max-w-4xl w-full p-3.5 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col h-[90dvh] sm:h-[85vh] max-h-[92dvh] sm:max-h-[850px] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between pb-4 border-b border-[#262626] mb-4">
-                <div>
-                  <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#C5A059]">
+              {/* Pinned Modal Header */}
+              <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-[#262626] mb-2 sm:mb-3 shrink-0">
+                <div className="min-w-0 pr-2">
+                  <span className="text-xs font-mono uppercase tracking-[0.2em] text-[#C5A059] block truncate">
                     Add Photos to "{activeAlbum.name}"
                   </span>
-                  <p className="text-[11px] text-[#888888] mt-0.5">
+                  <p className="text-[11px] text-[#888888] mt-0.5 truncate">
                     Select photos from your Gallery to organize into this album
                   </p>
                 </div>
@@ -1699,21 +1715,28 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                     setAddPhotosToCurrentAlbumModal(false);
                     setPhotosToAddToAlbum(new Set());
                   }}
-                  className="text-[#888888] hover:text-white"
+                  className="text-[#888888] hover:text-white p-1 shrink-0 transition-colors"
+                  title="Close"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5 sm:w-4 sm:h-4" />
                 </button>
               </div>
 
-              {/* Photo selector grid */}
-              <div className="flex-1 overflow-y-auto pr-1 my-2">
-                {images.length === 0 ? (
-                  <p className="text-xs text-[#777777] italic py-8 text-center">
-                    No photos uploaded to your gallery yet. Use the upload button in the header.
-                  </p>
+              {/* Photo selector scrollable area with smooth vertical mobile scrolling */}
+              <div
+                ref={addPhotosScrollRef}
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 sm:pr-2 my-1 touch-pan-y"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                {allImages.length === 0 ? (
+                  <div className="py-12 px-4 text-center">
+                    <p className="text-xs text-[#777777] italic">
+                      No photos uploaded to your gallery yet. Use the upload button in the header.
+                    </p>
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {images.map((img) => {
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 pb-2">
+                    {allImages.map((img) => {
                       const alreadyInAlbum = activeAlbum.imageIds.includes(img.id);
                       const isSelected = photosToAddToAlbum.has(img.id);
 
@@ -1729,25 +1752,79 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                               return next;
                             });
                           }}
-                          className={`relative aspect-square overflow-hidden border transition-all cursor-pointer ${
+                          className={`group relative flex flex-col border transition-all cursor-pointer bg-[#0D0D0D] overflow-hidden ${
                             alreadyInAlbum
-                              ? 'opacity-40 border-black cursor-not-allowed'
+                              ? 'opacity-45 border-[#222222] cursor-not-allowed'
                               : isSelected
-                              ? 'border-[#C5A059] ring-2 ring-[#C5A059]'
-                              : 'border-[#262626] hover:border-white/50'
+                              ? 'border-[#C5A059] ring-2 ring-[#C5A059] shadow-md shadow-[#C5A059]/10'
+                              : 'border-[#262626] hover:border-[#C5A059]/60 hover:bg-[#121212]'
                           }`}
                         >
-                          <img src={resolveImageUrl(img.dataUrl || img.imageUrl)} alt="" className="w-full h-full object-cover" />
-                          {alreadyInAlbum && (
-                            <span className="absolute inset-0 bg-black/60 flex items-center justify-center text-[10px] font-mono text-[#A0A0A0] text-center px-1">
-                              Already In Album
-                            </span>
-                          )}
-                          {!alreadyInAlbum && isSelected && (
-                            <div className="absolute top-1.5 right-1.5 p-0.5 bg-[#C5A059] text-black">
-                              <Check className="w-3.5 h-3.5" />
+                          {/* Landscape-friendly display container with 16:10 aspect ratio */}
+                          <div className="relative w-full aspect-[16/10] bg-[#0A0A0A] flex items-center justify-center p-1.5 overflow-hidden">
+                            <img
+                              src={resolveImageUrl(img.dataUrl || img.imageUrl)}
+                              alt={img.title || 'Gallery Photo'}
+                              className="max-w-full max-h-full w-auto h-auto object-contain select-none pointer-events-none transition-transform duration-200 group-hover:scale-[1.02]"
+                              loading="lazy"
+                            />
+
+                            {/* Already In Album Overlay */}
+                            {alreadyInAlbum && (
+                              <div className="absolute inset-0 bg-black/70 backdrop-blur-[1px] flex items-center justify-center p-2">
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-[#B0B0B0] bg-black/90 px-2.5 py-1 border border-white/10">
+                                  Already in Album
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Selection Checkmark Indicator Badge */}
+                            {!alreadyInAlbum && (
+                              <div
+                                className={`absolute top-2 right-2 w-6 h-6 flex items-center justify-center transition-all ${
+                                  isSelected
+                                    ? 'bg-[#C5A059] text-black shadow-md'
+                                    : 'bg-black/75 text-transparent border border-white/20 group-hover:border-[#C5A059]'
+                                }`}
+                              >
+                                <Check className={`w-3.5 h-3.5 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-40 text-white'}`} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Landscape Card Info Strip */}
+                          <div className="px-3 py-2 bg-[#141414] border-t border-[#222222] flex items-center justify-between gap-2 shrink-0">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-white truncate" title={img.title || 'Untitled Photo'}>
+                                {img.title || 'Untitled Photo'}
+                              </p>
+                              {img.category ? (
+                                <span className="text-[10px] font-mono text-[#888888] uppercase tracking-wider block truncate">
+                                  {img.category}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono text-[#555555] block truncate">
+                                  {img.width && img.height ? `${img.width} × ${img.height}` : 'Photo'}
+                                </span>
+                              )}
                             </div>
-                          )}
+
+                            <div className="shrink-0">
+                              {alreadyInAlbum ? (
+                                <span className="text-[10px] font-mono text-[#666666]">
+                                  In Album
+                                </span>
+                              ) : isSelected ? (
+                                <span className="text-[10px] font-mono text-[#C5A059] font-semibold">
+                                  Selected
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono text-[#777777] group-hover:text-white transition-colors">
+                                  Select
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -1755,20 +1832,31 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                 )}
               </div>
 
-              {/* Bottom confirmation */}
-              <div className="flex items-center justify-between pt-4 border-t border-[#262626] mt-2">
-                <span className="text-xs font-mono text-[#C5A059]">
-                  {photosToAddToAlbum.size} photo(s) selected
-                </span>
+              {/* Pinned Bottom Confirmation Actions */}
+              <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-[#262626] mt-auto shrink-0 bg-[#141414]">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-[#C5A059] font-medium">
+                    {photosToAddToAlbum.size} photo(s) selected
+                  </span>
+                  {photosToAddToAlbum.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPhotosToAddToAlbum(new Set())}
+                      className="text-[11px] text-[#888888] hover:text-white underline ml-1"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setAddPhotosToCurrentAlbumModal(false);
                       setPhotosToAddToAlbum(new Set());
                     }}
-                    className="px-4 py-2 bg-[#1A1A1A] hover:bg-[#222222] text-xs uppercase tracking-wider text-[#888888] hover:text-white"
+                    className="px-3.5 sm:px-4 py-2 bg-[#1A1A1A] hover:bg-[#222222] text-xs uppercase tracking-wider text-[#888888] hover:text-white border border-[#2D2D2D] transition-colors"
                   >
                     Cancel
                   </button>
@@ -1776,7 +1864,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                     type="button"
                     onClick={handleSavePhotosToActiveAlbum}
                     disabled={photosToAddToAlbum.size === 0}
-                    className="px-5 py-2 bg-[#C5A059] hover:bg-[#D4AF37] text-black font-semibold text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-4 sm:px-5 py-2 bg-[#C5A059] hover:bg-[#D4AF37] text-black font-semibold text-xs uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Add to Album
                   </button>
