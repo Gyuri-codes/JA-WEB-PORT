@@ -35,7 +35,8 @@ import {
   addImagesToAlbum,
   removeImagesFromAlbum,
   moveImagesBetweenAlbums,
-  processAndOptimizeImageFile
+  processAndOptimizeImageFile,
+  resolveImageUrl
 } from '../utils/galleryStorage';
 import {
   getCertificationsAsGalleryImages,
@@ -1024,9 +1025,14 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                       {/* Album Cover Photo */}
                       {coverUrl ? (
                         <img
-                          src={coverUrl}
+                          src={resolveImageUrl(coverUrl)}
                           alt={album.name}
                           loading="lazy"
+                          onError={(e) => {
+                            if (e.currentTarget.src.includes('/uploads/gallery/')) {
+                              e.currentTarget.src = e.currentTarget.src.replace('/uploads/gallery/', '/assets/gallery/');
+                            }
+                          }}
                           className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
@@ -1157,9 +1163,14 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
 
                       {/* Photo Image Frame */}
                       <img
-                        src={img.dataUrl}
+                        src={resolveImageUrl(img.dataUrl || img.imageUrl)}
                         alt={img.title}
                         loading="lazy"
+                        onError={(e) => {
+                          if (e.currentTarget.src.includes('/uploads/gallery/')) {
+                            e.currentTarget.src = e.currentTarget.src.replace('/uploads/gallery/', '/assets/gallery/');
+                          }
+                        }}
                         className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                       />
 
@@ -1398,8 +1409,13 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
 
               <div className="max-w-5xl max-h-[75vh] flex items-center justify-center p-2">
                 <img
-                  src={activeLightboxImage.dataUrl}
+                  src={resolveImageUrl(activeLightboxImage.dataUrl || activeLightboxImage.imageUrl)}
                   alt={activeLightboxImage.title}
+                  onError={(e) => {
+                    if (e.currentTarget.src.includes('/uploads/gallery/')) {
+                      e.currentTarget.src = e.currentTarget.src.replace('/uploads/gallery/', '/assets/gallery/');
+                    }
+                  }}
                   className="max-w-full max-h-[75vh] object-contain shadow-2xl border border-[#222222]"
                 />
               </div>
@@ -1658,7 +1674,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 bg-black border border-[#333333] overflow-hidden shrink-0 flex items-center justify-center">
                               {cover ? (
-                                <img src={cover} alt="" className="w-full h-full object-cover" />
+                                <img src={resolveImageUrl(cover)} alt="" className="w-full h-full object-cover" />
                               ) : (
                                 <Folder className="w-4 h-4 text-[#666666]" />
                               )}
@@ -1766,7 +1782,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                               : 'border-[#262626] hover:border-white/50'
                           }`}
                         >
-                          <img src={img.dataUrl} alt="" className="w-full h-full object-cover" />
+                          <img src={resolveImageUrl(img.dataUrl || img.imageUrl)} alt="" className="w-full h-full object-cover" />
                           {alreadyInAlbum && (
                             <span className="absolute inset-0 bg-black/60 flex items-center justify-center text-[10px] font-mono text-[#A0A0A0] text-center px-1">
                               Already In Album

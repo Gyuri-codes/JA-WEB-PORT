@@ -21,13 +21,13 @@ if (typeof window !== 'undefined') {
 /**
  * Resolves repository-relative or base-relative image paths properly for both local dev and GitHub Pages.
  */
-export function resolveImageUrl(url: string): string {
+export function resolveImageUrl(url?: string | null): string {
   if (!url) return '';
   if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
-  const base = import.meta.env.BASE_URL || '/';
-  const cleanBase = base.endsWith('/') ? base.slice(0, -1) : base;
+  const rawBase = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/';
+  const cleanBase = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
 
   if (url.startsWith('/JA-WEB-PORT/')) {
     return `${cleanBase}${url.slice('/JA-WEB-PORT'.length)}`;
@@ -75,11 +75,13 @@ function sanitizeGalleryItem(item: GalleryImage): GalleryImage {
   if (item.category && REMOVED_GALLERY_CATEGORIES.has(item.category)) {
     return { ...item, category: undefined };
   }
-  // Ensure image URL is resolved to repository path
-  const resolved = resolveImageUrl(item.dataUrl);
+  // Ensure image URL is resolved to public repository path
+  const raw = item.dataUrl || item.imageUrl || '';
+  const resolved = resolveImageUrl(raw);
   return {
     ...item,
     dataUrl: resolved,
+    imageUrl: resolved,
   };
 }
 
@@ -118,13 +120,28 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
     console.warn('Could not read IndexedDB gallery items:', err);
   }
 
-  // 3. Try to fetch latest repository data from API or JSON file
+  // 3. Try localStorage fallback
+  let localFallback: GalleryImage[] = [];
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('ja_gallery_public_meta_v2');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          localFallback = parsed.map(sanitizeGalleryItem);
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Try to fetch latest repository data from API or JSON file
   let remoteImages: GalleryImage[] = [];
   if (typeof window !== 'undefined') {
     const endpoints = [
       `${import.meta.env.BASE_URL}api/gallery`,
       '/api/gallery',
       `${import.meta.env.BASE_URL}data/galleryImages.json`,
+      '/data/galleryImages.json',
     ];
 
     for (const url of endpoints) {
@@ -151,10 +168,15 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
   bundledImages.forEach((img) => mergedMap.set(img.id, img));
   // Overlay remote
   remoteImages.forEach((img) => mergedMap.set(img.id, img));
+  // Overlay local fallback
+  localFallback.forEach((img) => {
+    if (!mergedMap.has(img.id)) {
+      mergedMap.set(img.id, img);
+    }
+  });
   // Overlay local items
   localItems.forEach((img) => {
-    // If not already in map or if local has dataUrl, preserve
-    if (!mergedMap.has(img.id)) {
+    if (!mergedMap.has(img.id) || (img.dataUrl && img.dataUrl.startsWith('data:'))) {
       mergedMap.set(img.id, img);
     }
   });
@@ -232,6 +254,18 @@ export async function saveMultipleGalleryImages(
     }
 
     const currentImages = await loadGalleryImages();
+
+    if (typeof window !== 'undefined') {
+      try {
+        const shallow = currentImages.map(img => ({
+          ...img,
+          dataUrl: resolveImageUrl(img.dataUrl || img.imageUrl),
+          imageUrl: resolveImageUrl(img.imageUrl || img.dataUrl),
+        }));
+        localStorage.setItem('ja_gallery_public_meta_v2', JSON.stringify(shallow));
+      } catch {}
+    }
+
     return {
       added: newImages.length,
       total: currentImages.length,
@@ -329,6 +363,20 @@ export async function deleteMultipleGalleryImages(ids: string[]): Promise<boolea
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
+
+    // Delete in localStorage fallback
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('ja_gallery_public_meta_v2');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter((item: any) => !ids.includes(item.id));
+            localStorage.setItem('ja_gallery_public_meta_v2', JSON.stringify(filtered));
+          }
+        }
+      } catch {}
+    }
 
     // Delete on server
     if (typeof window !== 'undefined') {

@@ -262,6 +262,8 @@ function gallerySaverPlugin(): Plugin {
         const distJsonPath = path.resolve(__dirname, 'dist/data/galleryImages.json');
         const uploadDir = path.resolve(__dirname, 'public/uploads/gallery');
         const distUploadDir = path.resolve(__dirname, 'dist/uploads/gallery');
+        const galleryAssetsDir = path.resolve(__dirname, 'public/assets/gallery');
+        const distGalleryAssetsDir = path.resolve(__dirname, 'dist/assets/gallery');
 
         const readGalleryData = async (): Promise<{ images: any[]; albums: any[] }> => {
           try {
@@ -344,8 +346,10 @@ function gallerySaverPlugin(): Plugin {
               }
 
               await fs.mkdir(uploadDir, { recursive: true });
+              await fs.mkdir(galleryAssetsDir, { recursive: true });
               try {
                 await fs.mkdir(distUploadDir, { recursive: true });
+                await fs.mkdir(distGalleryAssetsDir, { recursive: true });
               } catch {}
 
               const savedImages: any[] = [];
@@ -365,13 +369,16 @@ function gallerySaverPlugin(): Plugin {
                 const safeId = (img.id || `gallery_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`).replace(/[^a-zA-Z0-9_-]/g, '_');
                 const fileName = `${safeId}.${ext}`;
                 const filePath = path.resolve(uploadDir, fileName);
+                const assetFilePath = path.resolve(galleryAssetsDir, fileName);
                 const buf = Buffer.from(base64Data, 'base64');
                 await fs.writeFile(filePath, buf);
+                await fs.writeFile(assetFilePath, buf);
                 try {
                   await fs.writeFile(path.resolve(distUploadDir, fileName), buf);
+                  await fs.writeFile(path.resolve(distGalleryAssetsDir, fileName), buf);
                 } catch {}
 
-                const repoUrl = `/JA-WEB-PORT/uploads/gallery/${fileName}`;
+                const repoUrl = `/JA-WEB-PORT/assets/gallery/${fileName}`;
 
                 const imageItem = {
                   id: img.id || safeId,
@@ -492,10 +499,26 @@ function gallerySaverPlugin(): Plugin {
                   }
                 } catch {}
                 try {
+                  const assetFiles = await fs.readdir(galleryAssetsDir);
+                  for (const f of assetFiles) {
+                    if (f.startsWith(`${id}.`)) {
+                      await fs.unlink(path.resolve(galleryAssetsDir, f));
+                    }
+                  }
+                } catch {}
+                try {
                   const distFiles = await fs.readdir(distUploadDir);
                   for (const f of distFiles) {
                     if (f.startsWith(`${id}.`)) {
                       await fs.unlink(path.resolve(distUploadDir, f));
+                    }
+                  }
+                } catch {}
+                try {
+                  const distAssetFiles = await fs.readdir(distGalleryAssetsDir);
+                  for (const f of distAssetFiles) {
+                    if (f.startsWith(`${id}.`)) {
+                      await fs.unlink(path.resolve(distGalleryAssetsDir, f));
                     }
                   }
                 } catch {}
