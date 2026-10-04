@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Building, X, ExternalLink, Upload, Trash2, CheckCircle2 } from 'lucide-react';
+import { Calendar, Building, X, ExternalLink, Upload, Trash2, CheckCircle2, Save, RefreshCw } from 'lucide-react';
 import { ThemeId, CertificationItem } from '../types';
 import { CERTIFICATIONS, THEME_CONFIGS } from '../data/portfolioData';
 import {
@@ -45,7 +45,19 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
   const [storedCerts, setStoredCerts] = useState<Record<string, StoredCertification>>(() => {
     return getStoredCertificationsSync();
   });
-  const [isSavingCertId, setIsSavingCertId] = useState<string | null>(null);
+
+  // Pending uploaded image dataUrls before/during save
+  const [pendingImages, setPendingImages] = useState<Record<string, string>>({});
+  // Save button states per cert: 'pending' (uploaded, waiting to save) | 'saving' | 'saved'
+  const [saveStates, setSaveStates] = useState<Record<string, 'pending' | 'saving' | 'saved'>>({});
+  const saveTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(saveTimersRef.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   // Sync with server API on mount and listen to global updates
   useEffect(() => {
@@ -74,37 +86,83 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const certMeta = CERTIFICATIONS.find((c) => c.id === certId);
-    setIsSavingCertId(certId);
+    // Clear any active timer for this certificate
+    if (saveTimersRef.current[certId]) {
+      clearTimeout(saveTimersRef.current[certId]);
+      delete saveTimersRef.current[certId];
+    }
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
       if (dataUrl) {
-        try {
-          const savedItem = await saveCertificationImage(certId, dataUrl, {
-            title: certMeta?.title,
-            issuer: certMeta?.issuer,
-            badgeLevel: certMeta?.badgeLevel,
-            description: certMeta?.description,
-            date: certMeta?.date,
-          });
-          setStoredCerts((prev) => ({ ...prev, [certId]: savedItem }));
-        } catch (err) {
-          console.error('Failed to save certification image:', err);
-        } finally {
-          setIsSavingCertId(null);
-        }
-      } else {
-        setIsSavingCertId(null);
+        // Show exact untouched uploaded image in its original form and appearance
+        setPendingImages((prev) => ({ ...prev, [certId]: dataUrl }));
+        // Reveal the SAVE button for this certificate
+        setSaveStates((prev) => ({ ...prev, [certId]: 'pending' }));
       }
     };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
+  const handleSaveCertImage = async (certId: string) => {
+    const dataUrl = pendingImages[certId] || storedCerts[certId]?.dataUrl || storedCerts[certId]?.imageUrl;
+    if (!dataUrl) return;
+
+    const certMeta = CERTIFICATIONS.find((c) => c.id === certId);
+    setSaveStates((prev) => ({ ...prev, [certId]: 'saving' }));
+
+    try {
+      const savedItem = await saveCertificationImage(certId, dataUrl, {
+        title: certMeta?.title,
+        issuer: certMeta?.issuer,
+        badgeLevel: certMeta?.badgeLevel,
+        description: certMeta?.description,
+        date: certMeta?.date,
+      });
+
+      setStoredCerts((prev) => ({ ...prev, [certId]: savedItem }));
+      setSaveStates((prev) => ({ ...prev, [certId]: 'saved' }));
+
+      // Automatically hide the Save button after exactly 3 seconds
+      if (saveTimersRef.current[certId]) {
+        clearTimeout(saveTimersRef.current[certId]);
+      }
+      saveTimersRef.current[certId] = setTimeout(() => {
+        setSaveStates((prev) => {
+          const next = { ...prev };
+          delete next[certId];
+          return next;
+        });
+        setPendingImages((prev) => {
+          const next = { ...prev };
+          delete next[certId];
+          return next;
+        });
+      }, 3000);
+    } catch (err) {
+      console.error('Failed to save certification image:', err);
+      setSaveStates((prev) => ({ ...prev, [certId]: 'pending' }));
+    }
+  };
+
   const handleRemoveImage = async (certId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (saveTimersRef.current[certId]) {
+      clearTimeout(saveTimersRef.current[certId]);
+      delete saveTimersRef.current[certId];
+    }
+    setPendingImages((prev) => {
+      const next = { ...prev };
+      delete next[certId];
+      return next;
+    });
+    setSaveStates((prev) => {
+      const next = { ...prev };
+      delete next[certId];
+      return next;
+    });
     try {
       await removeCertificationImage(certId);
       setStoredCerts((prev) => {
@@ -160,7 +218,7 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
   }, [replaceModalCert]);
 
   const activeModalImage = popupCert
-    ? storedCerts[popupCert.id]?.imageUrl || storedCerts[popupCert.id]?.dataUrl
+    ? pendingImages[popupCert.id] || storedCerts[popupCert.id]?.imageUrl || storedCerts[popupCert.id]?.dataUrl
     : undefined;
 
   return (
@@ -185,7 +243,7 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
         {/* Credentials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {CERTIFICATIONS.map((cert) => {
-            const currentImg = storedCerts[cert.id]?.imageUrl || storedCerts[cert.id]?.dataUrl;
+            const currentImg = pendingImages[cert.id] || storedCerts[cert.id]?.imageUrl || storedCerts[cert.id]?.dataUrl;
 
             return (
               <div
@@ -285,6 +343,38 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                             </span>
                           </div>
                         </div>
+
+                        {/* Save Button for Uploaded Image */}
+                        {saveStates[cert.id] && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSaveCertImage(cert.id);
+                            }}
+                            disabled={saveStates[cert.id] === 'saving'}
+                            className="w-full mt-2.5 py-1.5 px-3 bg-[#C5A059] hover:bg-[#d6b26b] text-[#0F0F0F] text-[10px] font-mono uppercase tracking-[0.15em] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                            title="Save uploaded certification image"
+                            id={`save-cert-btn-${cert.id}`}
+                          >
+                            {saveStates[cert.id] === 'saving' ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>SAVING...</span>
+                              </>
+                            ) : saveStates[cert.id] === 'saved' ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[#0F0F0F]" />
+                                <span>SAVED</span>
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-3.5 h-3.5" />
+                                <span>SAVE</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -549,11 +639,11 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
             </div>
 
             {/* Current Image Preview */}
-            {storedCerts[replaceModalCert.id] && (
+            {(pendingImages[replaceModalCert.id] || storedCerts[replaceModalCert.id]) && (
               <div className="mb-4 p-3 bg-[#1A1A1A] border border-[#262626] flex items-center gap-3">
                 <div className="w-16 h-16 bg-white p-1 border border-[#333] shrink-0 flex items-center justify-center overflow-hidden shadow-inner">
                   <img
-                    src={storedCerts[replaceModalCert.id]?.imageUrl || storedCerts[replaceModalCert.id]?.dataUrl}
+                    src={pendingImages[replaceModalCert.id] || storedCerts[replaceModalCert.id]?.imageUrl || storedCerts[replaceModalCert.id]?.dataUrl}
                     alt="Current Certificate Preview"
                     className="max-w-full max-h-full object-contain"
                   />
