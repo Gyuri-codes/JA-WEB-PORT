@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Building, X, ExternalLink, Upload, Trash2, CheckCircle2, Save, RefreshCw } from 'lucide-react';
+import { Calendar, Building, X, ExternalLink, Upload, Trash2, CheckCircle2, Save, RefreshCw, Undo2 } from 'lucide-react';
 import { ThemeId, CertificationItem } from '../types';
 import { CERTIFICATIONS, THEME_CONFIGS } from '../data/portfolioData';
 import {
@@ -7,6 +7,10 @@ import {
   fetchStoredCertifications,
   saveCertificationImage,
   removeCertificationImage,
+  resetCertificationImage,
+  resolveCertUrl,
+  getDefaultCertImageUrl,
+  getFallbackCertImageUrl,
   CERT_UPDATE_EVENT,
   StoredCertification,
 } from '../utils/certificationStorage';
@@ -179,6 +183,25 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
     }
   };
 
+  const handleResetCertImage = async (certId: string) => {
+    if (saveTimersRef.current[certId]) {
+      clearTimeout(saveTimersRef.current[certId]);
+      delete saveTimersRef.current[certId];
+    }
+    setPendingImages((prev) => {
+      const next = { ...prev };
+      delete next[certId];
+      return next;
+    });
+    setSaveStates((prev) => {
+      const next = { ...prev };
+      delete next[certId];
+      return next;
+    });
+    const defaultItem = await resetCertificationImage(certId);
+    setStoredCerts((prev) => ({ ...prev, [certId]: defaultItem }));
+  };
+
   const handlePreviewClick = (cert: CertificationItem) => {
     setPopupCert(cert);
     setIsEnlarged(false);
@@ -218,7 +241,10 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
   }, [replaceModalCert]);
 
   const activeModalImage = popupCert
-    ? pendingImages[popupCert.id] || storedCerts[popupCert.id]?.imageUrl || storedCerts[popupCert.id]?.dataUrl
+    ? pendingImages[popupCert.id] ||
+      resolveCertUrl(storedCerts[popupCert.id]?.imageUrl || storedCerts[popupCert.id]?.dataUrl) ||
+      (popupCert.image ? resolveCertUrl(popupCert.image) : '') ||
+      getDefaultCertImageUrl(popupCert.id)
     : undefined;
 
   return (
@@ -243,7 +269,11 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
         {/* Credentials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {CERTIFICATIONS.map((cert) => {
-            const currentImg = pendingImages[cert.id] || storedCerts[cert.id]?.imageUrl || storedCerts[cert.id]?.dataUrl;
+            const currentImg =
+              pendingImages[cert.id] ||
+              resolveCertUrl(storedCerts[cert.id]?.imageUrl || storedCerts[cert.id]?.dataUrl) ||
+              (cert.image ? resolveCertUrl(cert.image) : '') ||
+              getDefaultCertImageUrl(cert.id);
 
             return (
               <div
@@ -332,6 +362,12 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                           <img
                             src={currentImg}
                             alt={`${cert.title} Certificate`}
+                            onError={(e) => {
+                              const fallback = getFallbackCertImageUrl(cert.id);
+                              if (fallback && e.currentTarget.src !== fallback) {
+                                e.currentTarget.src = fallback;
+                              }
+                            }}
                             className="w-full h-auto max-h-56 sm:max-h-60 object-contain drop-shadow group-hover/certimg:scale-[1.02] transition-transform duration-300"
                           />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/certimg:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 pointer-events-none p-3 text-center">
@@ -344,36 +380,50 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
                           </div>
                         </div>
 
-                        {/* Save Button for Uploaded Image */}
+                        {/* Save & Reset Action Bar for Uploaded Image */}
                         {saveStates[cert.id] && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSaveCertImage(cert.id);
-                            }}
-                            disabled={saveStates[cert.id] === 'saving'}
-                            className="w-full mt-2.5 py-1.5 px-3 bg-[#C5A059] hover:bg-[#d6b26b] text-[#0F0F0F] text-[10px] font-mono uppercase tracking-[0.15em] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
-                            title="Save uploaded certification image"
-                            id={`save-cert-btn-${cert.id}`}
-                          >
-                            {saveStates[cert.id] === 'saving' ? (
-                              <>
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                <span>SAVING...</span>
-                              </>
-                            ) : saveStates[cert.id] === 'saved' ? (
-                              <>
-                                <CheckCircle2 className="w-3.5 h-3.5 text-[#0F0F0F]" />
-                                <span>SAVED</span>
-                              </>
-                            ) : (
-                              <>
-                                <Save className="w-3.5 h-3.5" />
-                                <span>SAVE</span>
-                              </>
-                            )}
-                          </button>
+                          <div className="w-full mt-2.5 flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveCertImage(cert.id);
+                              }}
+                              disabled={saveStates[cert.id] === 'saving'}
+                              className="flex-1 py-1.5 px-3 bg-[#C5A059] hover:bg-[#d6b26b] text-[#0F0F0F] text-[10px] font-mono uppercase tracking-[0.15em] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer"
+                              title="Save uploaded certification image"
+                              id={`save-cert-btn-${cert.id}`}
+                            >
+                              {saveStates[cert.id] === 'saving' ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>SAVING...</span>
+                                </>
+                              ) : saveStates[cert.id] === 'saved' ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#0F0F0F]" />
+                                  <span>SAVED</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-3.5 h-3.5" />
+                                  <span>SAVE</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResetCertImage(cert.id);
+                              }}
+                              className="py-1.5 px-2.5 text-[#888888] hover:text-[#C5A059] border border-[#333333] hover:border-[#C5A059] bg-[#141414] hover:bg-[#1f1f1f] text-[10px] font-mono uppercase tracking-wider flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Reset to default official certificate"
+                            >
+                              <Undo2 className="w-3 h-3" />
+                              <span>Reset</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}
@@ -721,20 +771,36 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
 
             {/* Modal Actions */}
             <div className="mt-4 pt-3 border-t border-[#262626] flex items-center justify-between text-xs font-mono">
-              <button
-                type="button"
-                onClick={(e) => {
-                  if (replaceModalCert) {
-                    handleRemoveImage(replaceModalCert.id, e);
-                    setReplaceModalCert(null);
-                  }
-                }}
-                className="text-[#ff6b6b] hover:text-[#ff9494] hover:bg-red-950/40 border border-red-900/40 hover:border-red-800 transition-all cursor-pointer py-1.5 px-3 flex items-center gap-1.5"
-                title="Remove certification image"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-[#ff6b6b]" />
-                <span>Remove</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (replaceModalCert) {
+                      handleResetCertImage(replaceModalCert.id);
+                      setReplaceModalCert(null);
+                    }
+                  }}
+                  className="text-[#888888] hover:text-[#C5A059] border border-[#333333] hover:border-[#C5A059] bg-[#1a1a1a] hover:bg-[#252525] transition-all cursor-pointer py-1.5 px-3 flex items-center gap-1.5"
+                  title="Reset to default official certificate"
+                >
+                  <Undo2 className="w-3.5 h-3.5 text-[#C5A059]" />
+                  <span>Reset</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    if (replaceModalCert) {
+                      handleRemoveImage(replaceModalCert.id, e);
+                      setReplaceModalCert(null);
+                    }
+                  }}
+                  className="text-[#ff6b6b] hover:text-[#ff9494] hover:bg-red-950/40 border border-red-900/40 hover:border-red-800 transition-all cursor-pointer py-1.5 px-3 flex items-center gap-1.5"
+                  title="Remove certification image"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-[#ff6b6b]" />
+                  <span>Remove</span>
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setReplaceModalCert(null)}

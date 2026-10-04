@@ -119,6 +119,9 @@ function certificationsSaverPlugin(): Plugin {
               }
 
               await fs.mkdir(uploadDir, { recursive: true });
+              const certAssetsDir = path.resolve(__dirname, 'public/assets/certificates');
+              const distCertAssetsDir = path.resolve(__dirname, 'dist/assets/certificates');
+              await fs.mkdir(certAssetsDir, { recursive: true });
 
               let ext = 'png';
               let base64Data = dataUrl;
@@ -130,11 +133,17 @@ function certificationsSaverPlugin(): Plugin {
 
               const fileName = `${certId}.${ext}`;
               const filePath = path.resolve(uploadDir, fileName);
+              const assetFilePath = path.resolve(certAssetsDir, fileName);
               const buf = Buffer.from(base64Data, 'base64');
+              
               await fs.writeFile(filePath, buf);
+              await fs.writeFile(assetFilePath, buf);
+
               try {
                 await fs.mkdir(distUploadDir, { recursive: true });
                 await fs.writeFile(path.resolve(distUploadDir, fileName), buf);
+                await fs.mkdir(distCertAssetsDir, { recursive: true });
+                await fs.writeFile(path.resolve(distCertAssetsDir, fileName), buf);
               } catch {
                 // ignore if dist not built yet
               }
@@ -142,7 +151,7 @@ function certificationsSaverPlugin(): Plugin {
               const currentData = await readCertData();
               const updatedItem = {
                 certId,
-                imageUrl: `/JA-WEB-PORT/uploads/certifications/${fileName}?v=${Date.now()}`,
+                imageUrl: `/JA-WEB-PORT/assets/certificates/${fileName}?v=${Date.now()}`,
                 title: title || currentData[certId]?.title || certId,
                 issuer: issuer || currentData[certId]?.issuer || '',
                 badgeLevel: badgeLevel || currentData[certId]?.badgeLevel || '',

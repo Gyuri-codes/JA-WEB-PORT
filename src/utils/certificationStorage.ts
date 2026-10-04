@@ -1,4 +1,5 @@
-import { GalleryImage } from '../types';
+import { GalleryImage, CertificationItem } from '../types';
+import { CERTIFICATIONS } from '../data/portfolioData';
 import defaultSavedCerts from '../data/savedCertifications.json';
 
 export interface StoredCertification {
@@ -24,6 +25,94 @@ const DB_NAME = 'JA_CERTIFICATIONS_DB_V1';
 const DB_VERSION = 1;
 const STORE_NAME = 'certifications';
 
+/**
+ * Resolves repository-relative or base-relative image paths properly for both local dev and GitHub Pages.
+ */
+export function resolveCertUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const rawBase = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL || '/';
+  const cleanBase = rawBase.endsWith('/') ? rawBase.slice(0, -1) : rawBase;
+
+  if (url.startsWith('/JA-WEB-PORT/')) {
+    return `${cleanBase}${url.slice('/JA-WEB-PORT'.length)}`;
+  }
+  if (url.startsWith('/')) {
+    return `${cleanBase}${url}`;
+  }
+  return `${cleanBase}/${url}`;
+}
+
+/**
+ * Permanent public repository asset locations for each certification.
+ * These assets are deployed directly to GitHub Pages and publicly accessible to anyone worldwide.
+ */
+export const DEFAULT_CERTIFICATE_ASSETS: Record<string, string[]> = {
+  'cert-housekeeping': [
+    'assets/certificates/cert-housekeeping.png',
+    'assets/certifications/cert-housekeeping.png',
+    'assets/certificates/nc2-housekeeping.svg',
+    'uploads/certifications/cert-housekeeping.png',
+    'Messenger_creation_F072B715-2C6F-4B02-98BD-A85383E1F7DD.png',
+  ],
+  'cert-fb-services': [
+    'assets/certificates/cert-fb-services.png',
+    'assets/certifications/cert-fb-services.png',
+    'assets/certificates/nc2-food-beverage.svg',
+    'uploads/certifications/cert-fb-services.png',
+    'Messenger_creation_23B7BA81-4417-4C76-B75D-AF084BF07E36.png',
+  ],
+  'cert-bread-pastry': [
+    'assets/certificates/cert-bread-pastry.png',
+    'assets/certifications/cert-bread-pastry.png',
+    'assets/certificates/nc2-bread-pastry.svg',
+    'uploads/certifications/cert-bread-pastry.png',
+    'Messenger_creation_F799F610-55BC-41A5-993C-A07A4DC8C48B.png',
+  ],
+  'cert-cookery': [
+    'assets/certificates/cert-cookery.png',
+    'assets/certifications/cert-cookery.png',
+    'assets/certificates/nc2-cookery.svg',
+    'uploads/certifications/cert-cookery.png',
+    'Messenger_creation_D1ABDE9B-478E-4C9A-AE51-DA281ACE8ED1.png',
+  ],
+  'cert-front-office': [
+    'assets/certificates/cert-front-office.png',
+    'assets/certifications/cert-front-office.png',
+    'assets/certificates/nc2-front-office.svg',
+    'uploads/certifications/cert-front-office.png',
+    'Messenger_creation_D9608875-2970-4258-B9C0-8FC653E6EF45.png',
+  ],
+  'cert-events-management': [
+    'assets/certificates/cert-events-management.png',
+    'assets/certifications/cert-events-management.png',
+    'assets/certificates/nc3-events-management.svg',
+    'uploads/certifications/cert-events-management.png',
+    'Messenger_creation_3EDB5EA7-CA91-4E1D-8C23-315B54ABF5B9.png',
+  ],
+};
+
+export function getDefaultCertImageUrl(certId: string): string {
+  const list = DEFAULT_CERTIFICATE_ASSETS[certId];
+  if (list && list[0]) {
+    return resolveCertUrl(list[0]);
+  }
+  return '';
+}
+
+export function getFallbackCertImageUrl(certId: string): string {
+  const list = DEFAULT_CERTIFICATE_ASSETS[certId];
+  if (list && list.length >= 3) {
+    return resolveCertUrl(list[2]); // The verified SVG
+  }
+  if (list && list[0]) {
+    return resolveCertUrl(list[0]);
+  }
+  return '';
+}
+
 function openCertDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
@@ -44,7 +133,6 @@ function openCertDB(): Promise<IDBDatabase> {
 
 /**
  * Retrieves all stored certifications from IndexedDB.
- * Holds exact uncompressed original image data with zero browser quota issues.
  */
 export async function getStoredCertsFromIDB(): Promise<Record<string, StoredCertification>> {
   try {
@@ -113,11 +201,14 @@ function normalizeSavedData(raw: any): Record<string, StoredCertification> {
 
   Object.entries(raw).forEach(([certId, val]: [string, any]) => {
     if (!val) return;
+    const defaultPublicAsset = getDefaultCertImageUrl(certId);
+
     if (typeof val === 'string') {
+      const resolved = resolveCertUrl(val);
       normalized[certId] = {
         certId,
-        imageUrl: val,
-        dataUrl: val,
+        imageUrl: resolved || defaultPublicAsset,
+        dataUrl: resolved || defaultPublicAsset,
         title: certId,
         issuer: '',
         badgeLevel: '',
@@ -126,10 +217,12 @@ function normalizeSavedData(raw: any): Record<string, StoredCertification> {
         uploadedAt: Date.now(),
       };
     } else if (typeof val === 'object') {
+      const rawUrl = val.imageUrl || val.dataUrl || defaultPublicAsset;
+      const resolved = resolveCertUrl(rawUrl);
       normalized[certId] = {
         certId: val.certId || certId,
-        imageUrl: val.imageUrl || val.dataUrl || '',
-        dataUrl: val.dataUrl,
+        imageUrl: resolved,
+        dataUrl: val.dataUrl ? resolveCertUrl(val.dataUrl) : resolved,
         title: val.title || certId,
         issuer: val.issuer || '',
         badgeLevel: val.badgeLevel || '',
@@ -144,19 +237,12 @@ function normalizeSavedData(raw: any): Record<string, StoredCertification> {
 }
 
 /**
- * Returns stored certifications synchronously from memory or bundled data.
+ * Returns stored certifications synchronously from bundled data + cache.
+ * Guarantees that every visitor on any device immediately sees authentic public images.
  */
 export function getStoredCertificationsSync(): Record<string, StoredCertification> {
   if (memoryCache) {
     return memoryCache;
-  }
-
-  // Clear legacy caches
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.removeItem('ja_portfolio_cert_images');
-      localStorage.removeItem('ja_portfolio_cert_images_v2');
-    } catch {}
   }
 
   const bundled = normalizeSavedData(defaultSavedCerts);
@@ -173,7 +259,28 @@ export function getStoredCertificationsSync(): Record<string, StoredCertificatio
     }
   }
 
-  memoryCache = { ...bundled, ...localData };
+  // Combine bundled permanent assets with any local cache
+  const merged: Record<string, StoredCertification> = { ...bundled, ...localData };
+
+  // Guarantee every certification in CERTIFICATIONS has a valid public asset URL
+  CERTIFICATIONS.forEach((c) => {
+    if (!merged[c.id] || !merged[c.id].imageUrl) {
+      const publicAssetUrl = resolveCertUrl(c.image || getDefaultCertImageUrl(c.id));
+      merged[c.id] = {
+        certId: c.id,
+        imageUrl: publicAssetUrl,
+        dataUrl: publicAssetUrl,
+        title: c.title,
+        issuer: c.issuer,
+        badgeLevel: c.badgeLevel,
+        description: c.description,
+        date: c.date,
+        uploadedAt: 1706000000000,
+      };
+    }
+  });
+
+  memoryCache = merged;
   return memoryCache;
 }
 
@@ -186,7 +293,7 @@ export async function fetchStoredCertifications(): Promise<Record<string, Stored
     return getStoredCertificationsSync();
   }
 
-  // 1. Immediately read from IndexedDB (instant, contains exact original uncompressed file data)
+  // 1. Immediately read from IndexedDB
   const idbData = await getStoredCertsFromIDB();
   if (Object.keys(idbData).length > 0) {
     memoryCache = { ...getStoredCertificationsSync(), ...idbData };
@@ -208,15 +315,19 @@ export async function fetchStoredCertifications(): Promise<Record<string, Stored
         const serverData = json.data !== undefined ? json.data : json;
         if (serverData && typeof serverData === 'object') {
           const normalizedServer = normalizeSavedData(serverData);
-          
-          // Merge server data with local IDB original data URLs to preserve 100% exact fidelity
-          const merged: Record<string, StoredCertification> = { ...normalizedServer };
+
+          const merged: Record<string, StoredCertification> = {
+            ...getStoredCertificationsSync(),
+            ...normalizedServer,
+          };
+
+          // Overlay local IDB data URLs if present
           Object.entries(idbData).forEach(([cId, item]) => {
             if (merged[cId]) {
               merged[cId] = {
                 ...merged[cId],
                 dataUrl: item.dataUrl || merged[cId].dataUrl,
-                imageUrl: item.dataUrl || merged[cId].imageUrl,
+                imageUrl: item.imageUrl || item.dataUrl || merged[cId].imageUrl,
               };
             } else {
               merged[cId] = item;
@@ -226,15 +337,12 @@ export async function fetchStoredCertifications(): Promise<Record<string, Stored
           memoryCache = merged;
 
           try {
-            // Save lightweight references to localStorage
             const shallowCopy: Record<string, any> = {};
             Object.entries(memoryCache).forEach(([k, v]) => {
               shallowCopy[k] = { ...v, dataUrl: undefined };
             });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(shallowCopy));
-          } catch {
-            // ignore localStorage quota
-          }
+          } catch {}
 
           window.dispatchEvent(new CustomEvent(CERT_UPDATE_EVENT, { detail: memoryCache }));
           return memoryCache;
@@ -264,11 +372,12 @@ export async function saveCertificationImage(
   } = {}
 ): Promise<StoredCertification> {
   const current = getStoredCertificationsSync();
+  const publicAssetUrl = resolveCertUrl(`assets/certificates/${certId}.png`);
 
   const newItem: StoredCertification = {
     certId,
-    imageUrl: dataUrl,
-    dataUrl,
+    imageUrl: publicAssetUrl,
+    dataUrl: dataUrl || publicAssetUrl,
     title: meta.title || current[certId]?.title || certId,
     issuer: meta.issuer || current[certId]?.issuer || '',
     badgeLevel: meta.badgeLevel || current[certId]?.badgeLevel || '',
@@ -296,7 +405,7 @@ export async function saveCertificationImage(
     window.dispatchEvent(new CustomEvent(CERT_UPDATE_EVENT, { detail: memoryCache }));
   }
 
-  // 4. Send exact original image bytes to server API
+  // 4. Send exact original image bytes to server API (saves to public/assets/certificates/ in workspace)
   const endpoints = [`${import.meta.env.BASE_URL}api/certifications`, '/api/certifications'];
   for (const url of endpoints) {
     try {
@@ -318,9 +427,9 @@ export async function saveCertificationImage(
         const result = await res.json();
         if (result.item) {
           const finalItem: StoredCertification = {
-            ...newItem,
-            // Keep the exact original dataUrl in memory and IDB, fallback to server URL
-            imageUrl: newItem.dataUrl || result.item.imageUrl,
+            ...result.item,
+            imageUrl: resolveCertUrl(result.item.imageUrl),
+            dataUrl: dataUrl || resolveCertUrl(result.item.imageUrl),
           };
           current[certId] = finalItem;
           memoryCache = { ...current };
@@ -338,11 +447,26 @@ export async function saveCertificationImage(
 }
 
 /**
- * Removes a certification image permanently from all storage layers.
+ * Resets a certification image to its clean default official public asset.
  */
-export async function removeCertificationImage(certId: string): Promise<void> {
+export async function resetCertificationImage(certId: string): Promise<StoredCertification> {
   const current = getStoredCertificationsSync();
-  delete current[certId];
+  const defaultPublicAsset = getDefaultCertImageUrl(certId);
+  const certMeta = CERTIFICATIONS.find((c) => c.id === certId);
+
+  const defaultItem: StoredCertification = {
+    certId,
+    imageUrl: defaultPublicAsset,
+    dataUrl: defaultPublicAsset,
+    title: certMeta?.title || certId,
+    issuer: certMeta?.issuer || '',
+    badgeLevel: certMeta?.badgeLevel || '',
+    description: certMeta?.description || '',
+    date: certMeta?.date || '',
+    uploadedAt: 1706000000000,
+  };
+
+  current[certId] = defaultItem;
   memoryCache = { ...current };
 
   await removeCertFromIDB(certId);
@@ -358,6 +482,7 @@ export async function removeCertificationImage(certId: string): Promise<void> {
     window.dispatchEvent(new CustomEvent(CERT_UPDATE_EVENT, { detail: memoryCache }));
   }
 
+  // Also call server DELETE if endpoint is available
   const endpoints = [`${import.meta.env.BASE_URL}api/certifications`, '/api/certifications'];
   for (const url of endpoints) {
     try {
@@ -369,6 +494,15 @@ export async function removeCertificationImage(certId: string): Promise<void> {
       break;
     } catch {}
   }
+
+  return defaultItem;
+}
+
+/**
+ * Removes a certification image permanently from all storage layers.
+ */
+export async function removeCertificationImage(certId: string): Promise<void> {
+  await resetCertificationImage(certId);
 }
 
 /**
@@ -383,7 +517,8 @@ export function getCertificationsAsGalleryImages(
     .filter((item) => item.imageUrl || item.dataUrl)
     .map((item) => ({
       id: `cert_${item.certId}`,
-      dataUrl: item.dataUrl || item.imageUrl || '',
+      dataUrl: resolveCertUrl(item.imageUrl || item.dataUrl || ''),
+      imageUrl: resolveCertUrl(item.imageUrl || item.dataUrl || ''),
       title: item.title,
       caption: `${item.badgeLevel ? item.badgeLevel + ' • ' : ''}Issued by ${item.issuer || 'Accredited Authority'}${item.date ? ' (' + item.date + ')' : ''}`,
       category: 'Certifications',
