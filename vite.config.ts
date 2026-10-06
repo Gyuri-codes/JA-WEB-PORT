@@ -351,6 +351,12 @@ function gallerySaverPlugin(): Plugin {
                 : [];
 
               if (incomingImages.length === 0) {
+                if (Array.isArray(payload.albums)) {
+                  await writeGalleryData(currentData);
+                  res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                  res.end(JSON.stringify({ success: true, data: currentData }));
+                  return;
+                }
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'No images provided' }));
                 return;
