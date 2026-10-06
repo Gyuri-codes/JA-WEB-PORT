@@ -59,7 +59,7 @@ export function CertificationsSection({ currentTheme }: CertificationsSectionPro
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      Object.values(saveTimersRef.current).forEach((timer) => clearTimeout(timer));
+      Object.values(saveTimersRef.current).forEach((timer: any) => clearTimeout(timer));
     };
   }, []);
 

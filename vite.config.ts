@@ -371,30 +371,36 @@ function gallerySaverPlugin(): Plugin {
               }
 
               for (const img of incomingImages) {
-                const dataUrl = img.dataUrl;
+                const dataUrl = img.dataUrl || img.imageUrl;
                 if (!dataUrl) continue;
 
-                let ext = 'png';
-                let base64Data = dataUrl;
-                const match = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-                if (match) {
-                  ext = match[1] === 'svg+xml' ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
-                  base64Data = match[2];
-                }
-
                 const safeId = (img.id || `gallery_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`).replace(/[^a-zA-Z0-9_-]/g, '_');
-                const fileName = `${safeId}.${ext}`;
-                const filePath = path.resolve(uploadDir, fileName);
-                const assetFilePath = path.resolve(galleryAssetsDir, fileName);
-                const buf = Buffer.from(base64Data, 'base64');
-                await fs.writeFile(filePath, buf);
-                await fs.writeFile(assetFilePath, buf);
-                try {
-                  await fs.writeFile(path.resolve(distUploadDir, fileName), buf);
-                  await fs.writeFile(path.resolve(distGalleryAssetsDir, fileName), buf);
-                } catch {}
+                let repoUrl = img.imageUrl || '';
 
-                const repoUrl = `/JA-WEB-PORT/assets/gallery/${fileName}`;
+                if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+                  let ext = 'png';
+                  let base64Data = dataUrl;
+                  const match = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+                  if (match) {
+                    ext = match[1] === 'svg+xml' ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
+                    base64Data = match[2];
+                  }
+
+                  const fileName = `${safeId}.${ext}`;
+                  const filePath = path.resolve(uploadDir, fileName);
+                  const assetFilePath = path.resolve(galleryAssetsDir, fileName);
+                  const buf = Buffer.from(base64Data, 'base64');
+                  await fs.writeFile(filePath, buf);
+                  await fs.writeFile(assetFilePath, buf);
+                  try {
+                    await fs.writeFile(path.resolve(distUploadDir, fileName), buf);
+                    await fs.writeFile(path.resolve(distGalleryAssetsDir, fileName), buf);
+                  } catch {}
+
+                  repoUrl = `/JA-WEB-PORT/assets/gallery/${fileName}`;
+                } else if (!repoUrl) {
+                  repoUrl = dataUrl;
+                }
 
                 const imageItem = {
                   id: img.id || safeId,
@@ -405,7 +411,7 @@ function gallerySaverPlugin(): Plugin {
                   category: img.category || '',
                   albumIds: Array.isArray(img.albumIds) ? img.albumIds : [],
                   uploadedAt: img.uploadedAt || Date.now(),
-                  sizeBytes: img.sizeBytes || buf.length,
+                  sizeBytes: img.sizeBytes || 0,
                   width: img.width || 1200,
                   height: img.height || 800,
                 };

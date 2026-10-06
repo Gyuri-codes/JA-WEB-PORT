@@ -19,7 +19,9 @@ import {
   Info,
   Images,
   RefreshCw,
-  CloudUpload
+  CloudUpload,
+  Save,
+  CheckCircle2
 } from 'lucide-react';
 import { ThemeId, GalleryImage, GalleryAlbum } from '../types';
 import { THEME_CONFIGS } from '../data/portfolioData';
@@ -113,6 +115,10 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
   // Notification Toast
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warning' | 'info' } | null>(null);
 
+  // Gallery Save Button State
+  const [gallerySaveState, setGallerySaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const gallerySaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Single file input reference (The ONE and ONLY upload button in the gallery)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addPhotosScrollRef = useRef<HTMLDivElement>(null);
@@ -196,30 +202,65 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     return () => {
       isMounted = false;
       window.removeEventListener('ja_gallery_images_updated', handleGalleryUpdate);
+      if (gallerySaveTimerRef.current) {
+        clearTimeout(gallerySaveTimerRef.current);
+      }
     };
   }, []);
 
-  const handleSyncBrowserImages = async () => {
+  const handleManualSaveGallery = async () => {
     setIsUploading(true);
-    setUploadProgress('Checking browser storage for photos...');
+    setGallerySaveState('saving');
+    setUploadProgress('Saving photos to permanent repository storage...');
     try {
+      // 1. Run migration for any base64/local images to convert them to server repository assets
       const res = await autoMigrateBrowserImagesToRepository((migrated, total) => {
         setUploadProgress(`Saving photo ${migrated} of ${total} to repository assets...`);
       });
-      if (res.migratedCount > 0) {
-        const [refreshedImages, refreshedAlbums] = await Promise.all([
-          loadGalleryImages(),
-          loadGalleryAlbums()
-        ]);
-        setImages(refreshedImages);
-        setAlbums(refreshedAlbums);
-        showToast(`Successfully saved ${res.migratedCount} photos to repository assets!`, 'success');
-      } else {
-        showToast('All photos are already permanently saved in your repository.', 'info');
+
+      // 2. Also ensure current images in state with base64 are saved to server
+      const base64Images = images.filter(
+        (img) => img.dataUrl?.startsWith('data:image/') || img.imageUrl?.startsWith('data:image/')
+      );
+      if (base64Images.length > 0) {
+        await saveMultipleGalleryImages(base64Images);
       }
+
+      // 3. Sync albums to server
+      const currentAlbums = await loadGalleryAlbums();
+      if (typeof window !== 'undefined') {
+        const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+        for (const url of endpoints) {
+          try {
+            await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'save_albums', albums: currentAlbums }),
+            });
+            break;
+          } catch {}
+        }
+      }
+
+      // 4. Reload fresh data
+      const [refreshedImages, refreshedAlbums] = await Promise.all([
+        loadGalleryImages(),
+        loadGalleryAlbums()
+      ]);
+      setImages(refreshedImages);
+      setAlbums(refreshedAlbums);
+
+      setGallerySaveState('saved');
+      showToast('Gallery photo(s) permanently saved to portfolio!', 'success');
+
+      if (gallerySaveTimerRef.current) clearTimeout(gallerySaveTimerRef.current);
+      gallerySaveTimerRef.current = setTimeout(() => {
+        setGallerySaveState('idle');
+      }, 3000);
     } catch (err) {
-      console.error('Manual sync failed:', err);
-      showToast('Sync check completed.', 'info');
+      console.error('Save gallery error:', err);
+      setGallerySaveState('idle');
+      showToast('Error saving photos. Please try again.', 'warning');
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -299,6 +340,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
             title: cleanTitle || 'Untitled Photo',
             caption: '',
             category: '',
+            albumIds: activeAlbum ? [activeAlbum.id] : [],
             uploadedAt: Date.now() + i,
             width,
             height,
@@ -310,6 +352,7 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
       }
 
       if (processedImages.length > 0) {
+        setGallerySaveState('saving');
         setUploadProgress('Saving to gallery repository storage...');
         const result = await saveMultipleGalleryImages(processedImages);
         const refreshed = await loadGalleryImages();
@@ -323,7 +366,13 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
           setAlbums(updatedAlbums);
         }
 
-        showToast(`Successfully added ${result.added} photo(s) to gallery storage.`, 'success');
+        setGallerySaveState('saved');
+        showToast(`Successfully saved ${result.added} photo(s) permanently to repository!`, 'success');
+
+        if (gallerySaveTimerRef.current) clearTimeout(gallerySaveTimerRef.current);
+        gallerySaveTimerRef.current = setTimeout(() => {
+          setGallerySaveState('idle');
+        }, 3000);
       }
     } catch (err) {
       console.error('Upload failed:', err);
@@ -779,15 +828,31 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
                 <span>Upload Photos</span>
               </button>
 
-              {/* Sync uploaded photos to permanent repository assets */}
+              {/* Dedicated SAVE Button matching About & Certifications Sections */}
               <button
                 type="button"
-                onClick={handleSyncBrowserImages}
-                disabled={isUploading}
-                className="p-2 bg-[#1A1A1A] hover:bg-[#252525] border border-[#333333] hover:border-[#C5A059] text-[#C5A059] hover:text-white transition-colors cursor-pointer disabled:opacity-50"
-                title="Sync uploaded photos to permanent repository assets"
+                id="save-gallery-btn"
+                onClick={handleManualSaveGallery}
+                disabled={gallerySaveState === 'saving' || isUploading}
+                className="px-4 py-2 bg-[#C5A059] hover:bg-[#d6b26b] text-[#0F0F0F] text-xs font-mono uppercase tracking-[0.15em] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                title="Permanently save Gallery photos to portfolio repository"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isUploading ? 'animate-spin' : ''}`} />
+                {gallerySaveState === 'saving' ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>SAVING...</span>
+                  </>
+                ) : gallerySaveState === 'saved' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#0F0F0F]" />
+                    <span>SAVED</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>SAVE</span>
+                  </>
+                )}
               </button>
 
               {/* Select Mode toggle (available when images exist in current view) */}

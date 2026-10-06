@@ -125,6 +125,15 @@ const REMOVED_GALLERY_CATEGORIES = new Set([
   'Hospitality'
 ]);
 
+export function isCertificationItem(item: any): boolean {
+  if (!item) return false;
+  const id = String(item.id || item.certId || '');
+  if (id.startsWith('cert_') || id.startsWith('cert-')) return true;
+  const url = String(item.imageUrl || item.dataUrl || '');
+  if (url.includes('/certificates/') || url.includes('/certifications/')) return true;
+  return false;
+}
+
 function sanitizeGalleryItem(item: GalleryImage): GalleryImage {
   if (item.category && REMOVED_GALLERY_CATEGORIES.has(item.category)) {
     return { ...item, category: undefined };
@@ -159,13 +168,13 @@ export function getStoredGalleryImagesSync(): GalleryImage[] {
     } catch {}
   }
   const mergedMap = new Map<string, GalleryImage>();
-  bundledRaw.map(sanitizeGalleryItem).forEach((img) => {
+  bundledRaw.filter((img) => !isCertificationItem(img)).map(sanitizeGalleryItem).forEach((img) => {
     if (!deletedSet.has(img.id)) mergedMap.set(img.id, img);
   });
-  localFallback.forEach((img) => {
+  localFallback.filter((img) => !isCertificationItem(img)).forEach((img) => {
     if (!deletedSet.has(img.id)) mergedMap.set(img.id, img);
   });
-  const list = Array.from(mergedMap.values()).filter((img) => !deletedSet.has(img.id));
+  const list = Array.from(mergedMap.values()).filter((img) => !deletedSet.has(img.id) && !isCertificationItem(img));
   list.sort((a, b) => b.uploadedAt - a.uploadedAt);
   return list;
 }
@@ -295,7 +304,7 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
     }
   });
 
-  const finalImages = Array.from(mergedMap.values()).filter((img) => !currentDeleted.has(img.id));
+  const finalImages = Array.from(mergedMap.values()).filter((img) => !currentDeleted.has(img.id) && !isCertificationItem(img));
   finalImages.sort((a, b) => b.uploadedAt - a.uploadedAt);
 
   // Sync back to IndexedDB so local cache is clean and deleted IDs are purged
@@ -465,7 +474,7 @@ export async function autoMigrateBrowserImagesToRepository(
                 getReq.onsuccess = () => {
                   const items: any[] = getReq.result || [];
                   items.forEach((item) => {
-                    if (item && item.id && !seenIds.has(item.id)) {
+                    if (item && item.id && !seenIds.has(item.id) && !isCertificationItem(item)) {
                       const data = item.dataUrl || item.imageUrl;
                       if (data && typeof data === 'string' && data.startsWith('data:image/')) {
                         if (!serverSavedIds.has(item.id)) {
@@ -545,7 +554,7 @@ export async function autoMigrateBrowserImagesToRepository(
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
             parsed.forEach((item: any) => {
-              if (item && item.id && !seenIds.has(item.id)) {
+              if (item && item.id && !seenIds.has(item.id) && !isCertificationItem(item)) {
                 const data = item.dataUrl || item.imageUrl;
                 if (data && typeof data === 'string' && data.startsWith('data:image/')) {
                   if (!serverSavedIds.has(item.id)) {
@@ -937,10 +946,11 @@ export async function deleteGalleryAlbum(id: string): Promise<boolean> {
 export async function addImagesToAlbum(albumId: string, imageIds: string[]): Promise<boolean> {
   try {
     const db = await openGalleryDB();
-    return new Promise<boolean>((resolve, reject) => {
-      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
-      const store = tx.objectStore(ALBUM_STORE_NAME);
-      const getReq = store.get(albumId);
+    await new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction([ALBUM_STORE_NAME, STORE_NAME], 'readwrite');
+      const albumStore = tx.objectStore(ALBUM_STORE_NAME);
+      const imgStore = tx.objectStore(STORE_NAME);
+      const getReq = albumStore.get(albumId);
 
       getReq.onsuccess = () => {
         const album: GalleryAlbum | undefined = getReq.result;
@@ -957,13 +967,44 @@ export async function addImagesToAlbum(albumId: string, imageIds: string[]): Pro
           album.coverImageId = album.imageIds[0];
         }
 
-        const putReq = store.put(album);
-        putReq.onsuccess = () => resolve(true);
-        putReq.onerror = () => reject(putReq.error);
+        albumStore.put(album);
+
+        // Also update albumIds on image records
+        imageIds.forEach((id) => {
+          const imgReq = imgStore.get(id);
+          imgReq.onsuccess = () => {
+            const img: GalleryImage | undefined = imgReq.result;
+            if (img) {
+              const aIds = new Set(img.albumIds || []);
+              aIds.add(albumId);
+              img.albumIds = Array.from(aIds);
+              imgStore.put(img);
+            }
+          };
+        });
       };
 
-      getReq.onerror = () => reject(getReq.error);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
     });
+
+    // Sync updated albums to server
+    const currentAlbums = await loadGalleryAlbums();
+    if (typeof window !== 'undefined') {
+      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+      for (const url of endpoints) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'save_albums', albums: currentAlbums }),
+          });
+          break;
+        } catch {}
+      }
+    }
+
+    return true;
   } catch (err) {
     console.error('Failed to add images to album:', err);
     return false;
@@ -976,10 +1017,11 @@ export async function addImagesToAlbum(albumId: string, imageIds: string[]): Pro
 export async function removeImagesFromAlbum(albumId: string, imageIds: string[]): Promise<boolean> {
   try {
     const db = await openGalleryDB();
-    return new Promise<boolean>((resolve, reject) => {
-      const tx = db.transaction(ALBUM_STORE_NAME, 'readwrite');
-      const store = tx.objectStore(ALBUM_STORE_NAME);
-      const getReq = store.get(albumId);
+    await new Promise<boolean>((resolve, reject) => {
+      const tx = db.transaction([ALBUM_STORE_NAME, STORE_NAME], 'readwrite');
+      const albumStore = tx.objectStore(ALBUM_STORE_NAME);
+      const imgStore = tx.objectStore(STORE_NAME);
+      const getReq = albumStore.get(albumId);
 
       getReq.onsuccess = () => {
         const album: GalleryAlbum | undefined = getReq.result;
@@ -995,13 +1037,42 @@ export async function removeImagesFromAlbum(albumId: string, imageIds: string[])
           album.coverImageId = album.imageIds[0] || undefined;
         }
 
-        const putReq = store.put(album);
-        putReq.onsuccess = () => resolve(true);
-        putReq.onerror = () => reject(putReq.error);
+        albumStore.put(album);
+
+        // Also remove albumId from image records
+        imageIds.forEach((id) => {
+          const imgReq = imgStore.get(id);
+          imgReq.onsuccess = () => {
+            const img: GalleryImage | undefined = imgReq.result;
+            if (img && Array.isArray(img.albumIds)) {
+              img.albumIds = img.albumIds.filter((aid) => aid !== albumId);
+              imgStore.put(img);
+            }
+          };
+        });
       };
 
-      getReq.onerror = () => reject(getReq.error);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
     });
+
+    // Sync updated albums to server
+    const currentAlbums = await loadGalleryAlbums();
+    if (typeof window !== 'undefined') {
+      const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
+      for (const url of endpoints) {
+        try {
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'save_albums', albums: currentAlbums }),
+          });
+          break;
+        } catch {}
+      }
+    }
+
+    return true;
   } catch (err) {
     console.error('Failed to remove images from album:', err);
     return false;

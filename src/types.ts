@@ -22,6 +22,7 @@ export type NavSectionId =
 export interface GalleryImage {
   id: string;
   dataUrl: string;
+  imageUrl?: string;
   title: string;
   caption?: string;
   category?: string;
