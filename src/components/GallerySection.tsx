@@ -218,12 +218,20 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
         setUploadProgress(`Saving photo ${migrated} of ${total} to repository assets...`);
       });
 
-      // 2. Also ensure current images in state with base64 are saved to server
-      const base64Images = images.filter(
-        (img) => img.dataUrl?.startsWith('data:image/') || img.imageUrl?.startsWith('data:image/')
+      // 2. Find any images in state that are not yet on the server or contain base64
+      const remoteCheck: any[] = await fetch(`${import.meta.env.BASE_URL}api/gallery`)
+        .then((r) => r.json())
+        .then((j) => j.data?.images || j.images || [])
+        .catch(() => []);
+      const remoteIdSet = new Set(remoteCheck.map((i: any) => i.id));
+      const unpersistedImages = images.filter(
+        (img) =>
+          !remoteIdSet.has(img.id) ||
+          img.dataUrl?.startsWith('data:image/') ||
+          img.imageUrl?.startsWith('data:image/')
       );
-      if (base64Images.length > 0) {
-        await saveMultipleGalleryImages(base64Images);
+      if (unpersistedImages.length > 0) {
+        await saveMultipleGalleryImages(unpersistedImages);
       }
 
       // 3. Sync albums to server
@@ -360,7 +368,9 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
 
         // If inside an active album, also add the newly uploaded photos to this album
         if (activeAlbum) {
-          const newIds = processedImages.map((p) => p.id);
+          const newIds = result.savedImages && result.savedImages.length > 0
+            ? result.savedImages.map((p) => p.id)
+            : processedImages.map((p) => p.id);
           await addImagesToAlbum(activeAlbum.id, newIds);
           const updatedAlbums = await loadGalleryAlbums();
           setAlbums(updatedAlbums);

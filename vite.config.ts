@@ -348,6 +348,8 @@ function gallerySaverPlugin(): Plugin {
                 ? payload.images
                 : payload.image
                 ? [payload.image]
+                : payload.dataUrl
+                ? [payload]
                 : [];
 
               if (incomingImages.length === 0) {
@@ -386,10 +388,15 @@ function gallerySaverPlugin(): Plugin {
                 if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
                   let ext = 'png';
                   let base64Data = dataUrl;
-                  const match = dataUrl.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
-                  if (match) {
-                    ext = match[1] === 'svg+xml' ? 'svg' : match[1] === 'jpeg' ? 'jpg' : match[1];
-                    base64Data = match[2];
+                  const commaIdx = dataUrl.indexOf(',');
+                  if (commaIdx > 0) {
+                    const header = dataUrl.substring(0, commaIdx);
+                    base64Data = dataUrl.substring(commaIdx + 1);
+                    const match = header.match(/data:image\/([a-zA-Z0-9+.-]+)/i);
+                    if (match) {
+                      const raw = match[1].toLowerCase();
+                      ext = raw === 'svg+xml' ? 'svg' : raw === 'jpeg' ? 'jpg' : raw;
+                    }
                   }
 
                   const fileName = `${safeId}.${ext}`;

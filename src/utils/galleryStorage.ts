@@ -298,7 +298,7 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
 
   localItems.forEach((img) => {
     if (!currentDeleted.has(img.id)) {
-      if (!mergedMap.has(img.id) || (img.dataUrl && img.dataUrl.startsWith('data:'))) {
+      if (!mergedMap.has(img.id)) {
         mergedMap.set(img.id, img);
       }
     }
@@ -334,7 +334,7 @@ export async function saveGalleryImage(image: GalleryImage): Promise<{ success: 
 export async function saveMultipleGalleryImages(
   newImages: GalleryImage[],
   onProgress?: (saved: number, total: number) => void
-): Promise<{ added: number; total: number }> {
+): Promise<{ added: number; total: number; savedImages?: GalleryImage[] }> {
   try {
     const newIds = newImages.map((img) => img.id);
     unmarkImageAsDeleted(newIds);
@@ -350,8 +350,8 @@ export async function saveMultipleGalleryImages(
       tx.onerror = () => reject(tx.error);
     });
 
-    // 2. Post to server endpoint in safe chunks of 2 to avoid payload limits
-    const CHUNK_SIZE = 2;
+    // 2. Post to server endpoint one by one (chunk size 1) to avoid payload limits
+    const CHUNK_SIZE = 1;
     const endpoints = [`${import.meta.env.BASE_URL}api/gallery`, '/api/gallery'];
     const savedServerImages: GalleryImage[] = [];
 
@@ -382,16 +382,15 @@ export async function saveMultipleGalleryImages(
       }
     }
 
-    // 3. Update IndexedDB with repository image URLs if returned, preserving original dataUrl fallback
+    // 3. Update IndexedDB with permanent repository image URLs
     if (savedServerImages.length > 0) {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       savedServerImages.forEach((img) => {
-        const orig = newImages.find((n) => n.id === img.id);
         const itemToStore: GalleryImage = {
           ...img,
-          dataUrl: orig?.dataUrl || img.dataUrl || img.imageUrl,
-          imageUrl: img.imageUrl,
+          dataUrl: resolveImageUrl(img.imageUrl || img.dataUrl),
+          imageUrl: resolveImageUrl(img.imageUrl || img.dataUrl),
         };
         store.put(itemToStore);
       });
@@ -414,6 +413,7 @@ export async function saveMultipleGalleryImages(
     return {
       added: savedServerImages.length > 0 ? savedServerImages.length : newImages.length,
       total: currentImages.length,
+      savedImages: savedServerImages,
     };
   } catch (err) {
     console.error('Failed to save multiple gallery images:', err);
@@ -439,11 +439,14 @@ export async function autoMigrateBrowserImagesToRepository(
     const seenIds = new Set<string>();
 
     // 1. Fetch current repository images to know what's already saved permanently on the server
-    const currentRemote = await loadGalleryImages();
+    const remoteList: any[] = await fetch(`${import.meta.env.BASE_URL}api/gallery`)
+      .then((r) => r.json())
+      .then((j) => j.data?.images || j.images || [])
+      .catch(() => (defaultGalleryData as any)?.images || []);
     const serverSavedIds = new Set(
-      currentRemote
-        .filter((img) => img.imageUrl && !img.imageUrl.startsWith('data:') && !img.imageUrl.startsWith('blob:'))
-        .map((img) => img.id)
+      remoteList
+        .filter((img: any) => img && img.imageUrl && !img.imageUrl.startsWith('data:') && !img.imageUrl.startsWith('blob:'))
+        .map((img: any) => img.id)
     );
 
     // 2. Check all possible IndexedDB databases
