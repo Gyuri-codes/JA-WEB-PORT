@@ -88,7 +88,11 @@ export function resolveImageUrl(url?: string | null): string {
   }
 
   // Safe encoding for GitHub Pages URLs with spaces or special characters
-  const encodedPath = encodeURI(pathWithoutBase);
+  let decodedPath = pathWithoutBase;
+  try {
+    decodedPath = decodeURI(pathWithoutBase);
+  } catch {}
+  const encodedPath = encodeURI(decodedPath);
   return `${cleanBase}${encodedPath}`;
 }
 
@@ -322,9 +326,12 @@ export async function loadGalleryImages(): Promise<GalleryImage[]> {
 /**
  * Saves a single gallery image permanently.
  */
-export async function saveGalleryImage(image: GalleryImage): Promise<{ success: boolean; reason?: string }> {
+export async function saveGalleryImage(
+  image: GalleryImage
+): Promise<{ success: boolean; savedImage?: GalleryImage; reason?: string }> {
   const res = await saveMultipleGalleryImages([image]);
-  return { success: res.added > 0 };
+  const saved = res.savedImages && res.savedImages[0] ? res.savedImages[0] : image;
+  return { success: res.added > 0, savedImage: saved };
 }
 
 /**

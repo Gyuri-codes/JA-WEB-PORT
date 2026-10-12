@@ -48,14 +48,6 @@ export function ContactSection({ currentTheme, onOpenResume }: ContactSectionPro
     setTimeout(() => setCopiedMessage(false), 3000);
   };
 
-  const openGmailWeb = () => {
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-      PERSONAL_INFO.email
-    )}&su=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(
-      `Name: ${formData.name}\nEmail: ${formData.email}\n\nMessage:\n${formData.message}`
-    )}`;
-    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
-  };
 
   const copyEmail = () => {
     navigator.clipboard.writeText(PERSONAL_INFO.email);
@@ -281,14 +273,19 @@ export function ContactSection({ currentTheme, onOpenResume }: ContactSectionPro
                       {copiedMessage ? <Check className="w-3 h-3 text-[#C5A059]" /> : <Copy className="w-3 h-3 text-[#C5A059]" />}
                       <span>{copiedMessage ? 'Message Copied!' : 'Copy Formatted Message'}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={openGmailWeb}
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+                        PERSONAL_INFO.email
+                      )}&su=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(
+                        `Name: ${formData.name}\nEmail: ${formData.email}\n\nMessage:\n${formData.message}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="px-3 py-1.5 bg-[#1A1A1A] border border-[#333333] hover:border-[#C5A059] text-[#C5A059] text-[10px] uppercase font-mono tracking-wider flex items-center gap-1.5 transition-colors"
                     >
                       <Mail className="w-3 h-3" />
                       <span>Open in Gmail Web</span>
-                    </button>
+                    </a>
                   </div>
                 </div>
               )}

@@ -88,7 +88,7 @@ function certificationsSaverPlugin(): Plugin {
           }
         };
 
-        if (req.method === 'GET') {
+        if (req.method === 'GET' || req.method === 'HEAD') {
           try {
             const data = await readCertData();
             res.writeHead(200, {
@@ -303,7 +303,7 @@ function gallerySaverPlugin(): Plugin {
           } catch {}
         };
 
-        if (req.method === 'GET') {
+        if (req.method === 'GET' || req.method === 'HEAD') {
           try {
             const data = await readGalleryData();
             res.writeHead(200, {

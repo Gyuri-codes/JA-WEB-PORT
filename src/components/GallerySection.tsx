@@ -27,6 +27,7 @@ import { ThemeId, GalleryImage, GalleryAlbum } from '../types';
 import { THEME_CONFIGS } from '../data/portfolioData';
 import {
   loadGalleryImages,
+  saveGalleryImage,
   saveMultipleGalleryImages,
   updateGalleryImage,
   deleteGalleryImage,
@@ -231,7 +232,10 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
           img.imageUrl?.startsWith('data:image/')
       );
       if (unpersistedImages.length > 0) {
-        await saveMultipleGalleryImages(unpersistedImages);
+        for (let i = 0; i < unpersistedImages.length; i++) {
+          setUploadProgress(`Saving photo ${i + 1} of ${unpersistedImages.length}...`);
+          await saveGalleryImage(unpersistedImages[i]);
+        }
       }
 
       // 3. Sync albums to server
@@ -325,14 +329,15 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
     }
 
     setIsUploading(true);
+    setGallerySaveState('saving');
     setUploadProgress(`Processing ${fileArray.length} photo(s)...`);
 
     try {
-      const processedImages: GalleryImage[] = [];
+      const savedList: GalleryImage[] = [];
 
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
-        setUploadProgress(`Processing original ${i + 1} of ${fileArray.length}: ${file.name}`);
+        setUploadProgress(`Saving photo ${i + 1} of ${fileArray.length}: ${file.name}`);
 
         try {
           const { dataUrl, width, height, sizeBytes } = await processAndOptimizeImageFile(file);
@@ -342,9 +347,10 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
             .replace(/[-_]/g, ' ')
             .replace(/\b\w/g, (c) => c.toUpperCase());
 
-          processedImages.push({
+          const imageToSave: GalleryImage = {
             id: `gallery_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
             dataUrl,
+            imageUrl: dataUrl,
             title: cleanTitle || 'Untitled Photo',
             caption: '',
             category: '',
@@ -353,39 +359,48 @@ export function GallerySection({ currentTheme }: GallerySectionProps) {
             width,
             height,
             sizeBytes
+          };
+
+          // Save each image individually right as it is uploaded
+          const saveRes = await saveGalleryImage(imageToSave);
+          const finalItem = saveRes.savedImage || imageToSave;
+          savedList.push(finalItem);
+
+          // Update UI immediately as each image is saved so the user sees it without delay
+          setImages((prev) => {
+            const next = [finalItem, ...prev.filter((p) => p.id !== finalItem.id)];
+            return next;
           });
+
+          // If inside an active album, also add this image to the album immediately
+          if (activeAlbum) {
+            await addImagesToAlbum(activeAlbum.id, [finalItem.id]);
+            const updatedAlbums = await loadGalleryAlbums();
+            setAlbums(updatedAlbums);
+          }
         } catch (procErr) {
-          console.error(`Failed to process ${file.name}:`, procErr);
+          console.error(`Failed to process and save ${file.name}:`, procErr);
         }
       }
 
-      if (processedImages.length > 0) {
-        setGallerySaveState('saving');
-        setUploadProgress('Saving to gallery repository storage...');
-        const result = await saveMultipleGalleryImages(processedImages);
+      if (savedList.length > 0) {
+        // Final refresh from persistent storage to guarantee sync
         const refreshed = await loadGalleryImages();
         setImages(refreshed);
 
-        // If inside an active album, also add the newly uploaded photos to this album
-        if (activeAlbum) {
-          const newIds = result.savedImages && result.savedImages.length > 0
-            ? result.savedImages.map((p) => p.id)
-            : processedImages.map((p) => p.id);
-          await addImagesToAlbum(activeAlbum.id, newIds);
-          const updatedAlbums = await loadGalleryAlbums();
-          setAlbums(updatedAlbums);
-        }
-
         setGallerySaveState('saved');
-        showToast(`Successfully saved ${result.added} photo(s) permanently to repository!`, 'success');
+        showToast(`Successfully saved ${savedList.length} photo(s) permanently to repository!`, 'success');
 
         if (gallerySaveTimerRef.current) clearTimeout(gallerySaveTimerRef.current);
         gallerySaveTimerRef.current = setTimeout(() => {
           setGallerySaveState('idle');
         }, 3000);
+      } else {
+        setGallerySaveState('idle');
       }
     } catch (err) {
       console.error('Upload failed:', err);
+      setGallerySaveState('idle');
       showToast('An error occurred during upload. Please try again.', 'warning');
     } finally {
       setIsUploading(false);
